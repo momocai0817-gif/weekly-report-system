@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { getCurrentWeek, formatDateTime, copyToClipboard } from '@/lib/utils'
+import { getCurrentWeek, formatDateTime } from '@/lib/utils'
+import SignatureCanvas from '@/components/SignatureCanvas'
 
 export default function StudentReportPage() {
   const router = useRouter()
@@ -19,7 +20,11 @@ export default function StudentReportPage() {
     contacted_professor: false,
     professor_replied: false,
     reply_details: '',
+    not_contacted_reason: '',
   })
+
+  // 签名状态
+  const [signature, setSignature] = useState('')
 
   // 检查本周是否已提交
   const [existingReport, setExistingReport] = useState<any>(null)
@@ -56,7 +61,12 @@ export default function StudentReportPage() {
           contacted_professor: data.report.contacted_professor,
           professor_replied: data.report.professor_replied || false,
           reply_details: data.report.reply_details || '',
+          not_contacted_reason: data.report.not_contacted_reason || '',
         })
+        // 加载已有的签名
+        if (data.report.signature) {
+          setSignature(data.report.signature)
+        }
       }
     } catch (err) {
       console.error('检查报告失败:', err)
@@ -71,6 +81,37 @@ export default function StudentReportPage() {
     setError('')
     setMessage('')
 
+    // 验证：第一题选"否"时必须填写原因
+    if (!formData.contacted_professor && !formData.not_contacted_reason.trim()) {
+      setError('请填写未咨询导师的原因或现处阶段')
+      setSubmitting(false)
+      return
+    }
+
+    // 验证：第一题选"是"且第二题选"是"时必须填写具体情况说明
+    if (formData.contacted_professor && formData.professor_replied && !formData.reply_details.trim()) {
+      setError('请填写第3题：具体情况说明（50-100字）')
+      setSubmitting(false)
+      return
+    }
+
+    // 验证：具体情况说明字数限制（50-100字）
+    if (formData.contacted_professor && formData.professor_replied && formData.reply_details.trim()) {
+      const wordCount = formData.reply_details.trim().length
+      if (wordCount < 50 || wordCount > 100) {
+        setError(`具体情况说明需在50-100字之间，当前${wordCount}字`)
+        setSubmitting(false)
+        return
+      }
+    }
+
+    // 验证签名
+    if (!signature) {
+      setError('请先完成签名')
+      setSubmitting(false)
+      return
+    }
+
     try {
       const endpoint = existingReport
         ? `/api/report/update?id=${existingReport.id}`
@@ -84,6 +125,7 @@ export default function StudentReportPage() {
           weekNumber: currentWeek.weekNumber,
           year: currentWeek.year,
           ...formData,
+          signature,
         }),
       })
 
@@ -99,7 +141,6 @@ export default function StudentReportPage() {
         setExistingReport(data.report)
       }
 
-      // 3秒后清除消息
       setTimeout(() => setMessage(''), 3000)
     } catch (err: any) {
       setError(err.message)
@@ -127,13 +168,13 @@ export default function StudentReportPage() {
       <header className="bg-white shadow-sm">
         <div className="max-w-4xl mx-auto px-4 py-4 flex justify-between items-center">
           <div>
-            <h1 className="text-xl font-bold text-gray-800">论文导师周报系统</h1>
+            <h1 className="text-xl font-bold text-gray-800">论文指导周报系统</h1>
             <p className="text-sm text-gray-500">学生端</p>
           </div>
           <div className="flex items-center gap-4">
             <div className="text-right">
-              <p className="text-sm font-medium">{user?.name}</p>
-              <p className="text-xs text-gray-500">{user?.squad}</p>
+              <p className="text-sm font-medium text-gray-800">{user?.name}</p>
+              <p className="text-xs text-gray-600">{user?.squad}</p>
             </div>
             <button
               onClick={handleLogout}
@@ -211,7 +252,7 @@ export default function StudentReportPage() {
                     }
                     className="mr-2"
                   />
-                  <span>是</span>
+                  <span className="text-gray-800">是</span>
                 </label>
                 <label className="flex items-center">
                   <input
@@ -229,10 +270,31 @@ export default function StudentReportPage() {
                     }
                     className="mr-2"
                   />
-                  <span>否</span>
+                  <span className="text-gray-800">否</span>
                 </label>
               </div>
             </div>
+
+            {/* 未咨询原因 */}
+            {!formData.contacted_professor && (
+              <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  2. 请说明未咨询导师的原因或当前所处阶段 <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  value={formData.not_contacted_reason}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      not_contacted_reason: e.target.value,
+                    })
+                  }
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none resize-none placeholder-gray-700 text-gray-900"
+                  placeholder="请说明未咨询导师的原因，或描述当前论文写作进度/所处阶段..."
+                />
+              </div>
+            )}
 
             {/* 问题2：老师是否回复 */}
             {formData.contacted_professor && (
@@ -255,7 +317,7 @@ export default function StudentReportPage() {
                       }
                       className="mr-2"
                     />
-                    <span>是</span>
+                    <span className="text-gray-800">是</span>
                   </label>
                   <label className="flex items-center">
                     <input
@@ -271,20 +333,18 @@ export default function StudentReportPage() {
                       }
                       className="mr-2"
                     />
-                    <span>否</span>
+                    <span className="text-gray-800">否</span>
                   </label>
                 </div>
               </div>
             )}
 
-            {/* 具体情况说明 */}
-            {formData.contacted_professor && (
+            {/* 具体情况说明 - 仅当咨询过且导师回复时显示 */}
+            {formData.contacted_professor && formData.professor_replied && (
               <div className="animate-in fade-in slide-in-from-top-2 duration-300">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  3. 具体情况说明
-                  <span className="text-gray-400 font-normal">
-                    （聊天记录截图描述或回复内容）
-                  </span>
+                  3. 具体情况说明 <span className="text-red-500">*</span>
+                  <span className="text-gray-500 font-normal ml-2">（50-100字）</span>
                 </label>
                 <textarea
                   value={formData.reply_details}
@@ -294,15 +354,30 @@ export default function StudentReportPage() {
                       reply_details: e.target.value,
                     })
                   }
-                  rows={5}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none resize-none"
+                  rows={4}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none resize-none placeholder-gray-700 text-gray-900"
                   placeholder="请描述咨询的内容和导师的回复情况..."
                 />
-                <p className="text-xs text-gray-500 mt-1">
-                  * 建议保存聊天记录截图以备查验
-                </p>
+                <div className="mt-1 text-sm text-gray-500">
+                  字数统计：{formData.reply_details.trim().length}/100
+                  {formData.reply_details.trim().length > 0 && (formData.reply_details.trim().length < 50 || formData.reply_details.trim().length > 100) && (
+                    <span className="text-red-500 ml-2">需在50-100字之间</span>
+                  )}
+                </div>
               </div>
             )}
+
+            {/* 签名区域 */}
+            <div className="border-t pt-6">
+              <label className="block text-sm font-medium text-gray-700 mb-3">
+                {!formData.contacted_professor ? '3. 学生签名' : formData.professor_replied ? '4. 学生签名' : '3. 学生签名'} <span className="text-red-500">*</span>
+              </label>
+              <SignatureCanvas
+                value={signature}
+                onChange={setSignature}
+                disabled={submitting}
+              />
+            </div>
 
             {/* 提交按钮 */}
             <div className="flex gap-3">
@@ -311,11 +386,7 @@ export default function StudentReportPage() {
                 disabled={submitting}
                 className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
               >
-                {submitting
-                  ? '提交中...'
-                  : existingReport
-                  ? '更新周报'
-                  : '提交周报'}
+                {submitting ? '提交中...' : existingReport ? '更新周报' : '提交周报'}
               </button>
               {existingReport && (
                 <button

@@ -17,6 +17,8 @@ interface Report {
   contacted_professor: boolean
   professor_replied: boolean | null
   reply_details: string | null
+  not_contacted_reason: string | null
+  signature: string | null
   submitted_at: string
 }
 
@@ -76,7 +78,7 @@ export default function AdminReportsPage() {
       <header className="bg-white shadow-sm">
         <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
           <div>
-            <h1 className="text-xl font-bold text-gray-800">论文导师周报系统</h1>
+            <h1 className="text-xl font-bold text-gray-800">论文指导周报系统</h1>
             <p className="text-sm text-gray-500">查看周报</p>
           </div>
           <button
@@ -180,11 +182,11 @@ function ReportCard({ report }: { report: Report }) {
       <div className="flex items-start justify-between">
         <div className="flex-1">
           <div className="flex items-center gap-3">
-            <span className="font-medium">{report.student.name}</span>
-            <span className="text-sm text-gray-500">
+            <span className="font-medium text-gray-900">{report.student.name}</span>
+            <span className="text-sm text-gray-700">
               ({report.student.student_id})
             </span>
-            <span className="text-sm text-gray-400">
+            <span className="text-sm text-gray-600">
               导师：{report.student.advisor}
             </span>
           </div>
@@ -214,7 +216,7 @@ function ReportCard({ report }: { report: Report }) {
             </span>
           </div>
         </div>
-        {report.contacted_professor && report.reply_details && (
+        {(report.contacted_professor || report.not_contacted_reason || report.signature) && (
           <button
             onClick={() => setExpanded(!expanded)}
             className="text-sm text-blue-600 hover:text-blue-800"
@@ -224,11 +226,34 @@ function ReportCard({ report }: { report: Report }) {
         )}
       </div>
 
-      {expanded && report.reply_details && (
-        <div className="mt-3 p-3 bg-gray-50 rounded-lg">
-          <p className="text-sm text-gray-700 whitespace-pre-wrap">
-            {report.reply_details}
-          </p>
+      {expanded && (
+        <div className="mt-3 space-y-3">
+          {report.not_contacted_reason && (
+            <div className="p-3 bg-gray-50 rounded-lg">
+              <p className="text-xs text-gray-500 mb-1">未咨询原因/所处阶段：</p>
+              <p className="text-sm text-gray-800 whitespace-pre-wrap">
+                {report.not_contacted_reason}
+              </p>
+            </div>
+          )}
+          {report.reply_details && (
+            <div className="p-3 bg-gray-50 rounded-lg">
+              <p className="text-xs text-gray-500 mb-1">具体情况说明：</p>
+              <p className="text-sm text-gray-800 whitespace-pre-wrap">
+                {report.reply_details}
+              </p>
+            </div>
+          )}
+          {report.signature && (
+            <div className="p-3 bg-gray-50 rounded-lg">
+              <p className="text-xs text-gray-500 mb-2">学生签名：</p>
+              <img
+                src={report.signature}
+                alt="学生签名"
+                className="h-16 bg-white border border-gray-200 rounded"
+              />
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -64,7 +64,7 @@ export default function AdminArchivePage() {
       <header className="bg-white shadow-sm">
         <div className="max-w-4xl mx-auto px-4 py-4 flex justify-between items-center">
           <div>
-            <h1 className="text-xl font-bold text-gray-800">论文导师周报系统</h1>
+            <h1 className="text-xl font-bold text-gray-800">论文指导周报系统</h1>
             <p className="text-sm text-gray-500">历史归档</p>
           </div>
           <button

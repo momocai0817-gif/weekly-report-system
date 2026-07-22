@@ -34,7 +34,7 @@ export interface WeeklyReport {
   contacted_professor: boolean
   professor_replied: boolean | null
   reply_details: string | null
-  screenshot_urls: string[] | null
+  signature: string | null
   submitted_at: string
 }
 

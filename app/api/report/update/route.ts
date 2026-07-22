@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { contacted_professor, professor_replied, reply_details } = body
+    const { contacted_professor, professor_replied, reply_details, signature, not_contacted_reason } = body
 
     const supabase = createServiceClient()
 
@@ -32,18 +32,40 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 更新报告
-    const { data, error } = await supabase
+    // 构建更新数据对象
+    const updateData: any = {
+      contacted_professor,
+      professor_replied: contacted_professor ? professor_replied : null,
+      reply_details: contacted_professor ? reply_details : null,
+      signature: signature || null,
+      submitted_at: new Date().toISOString(),
+    }
+
+    // 添加 not_contacted_reason 字段（向后兼容）
+    if (not_contacted_reason !== undefined) {
+      updateData.not_contacted_reason = !contacted_professor ? not_contacted_reason : null
+    }
+
+    // 先尝试更新
+    let { data, error } = await supabase
       .from('weekly_reports')
-      .update({
-        contacted_professor,
-        professor_replied: contacted_professor ? professor_replied : null,
-        reply_details: contacted_professor ? reply_details : null,
-        submitted_at: new Date().toISOString(),
-      })
+      .update(updateData)
       .eq('id', id)
       .select()
       .single()
+
+    // 如果错误是因为 not_contacted_reason 字段不存在，则重试不包含该字段
+    if (error && error.message && error.message.includes('not_contacted_reason')) {
+      const { not_contacted_reason: _, ...updateDataRetry } = updateData
+      const result = await supabase
+        .from('weekly_reports')
+        .update(updateDataRetry)
+        .eq('id', id)
+        .select()
+        .single()
+      data = result.data
+      error = result.error
+    }
 
     if (error) {
       console.error('更新错误:', error)

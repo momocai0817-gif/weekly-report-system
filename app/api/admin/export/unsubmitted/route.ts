@@ -7,6 +7,7 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams
     const week = searchParams.get('week')
     const year = searchParams.get('year')
+    const squad = searchParams.get('squad') // 新增：区队参数
 
     if (!week || !year) {
       return NextResponse.json(
@@ -17,10 +18,17 @@ export async function GET(request: NextRequest) {
 
     const supabase = createServiceClient()
 
-    // 获取所有学生
-    const { data: students, error: studentsError } = await supabase
+    // 构建查询，如果有区队参数则添加过滤
+    let query = supabase
       .from('students')
       .select('id, name, student_id, squad, advisor')
+
+    if (squad) {
+      query = query.eq('squad', squad)
+    }
+
+    // 获取学生列表
+    const { data: students, error: studentsError } = await query
       .order('squad', { ascending: true })
       .order('student_id', { ascending: true })
 
@@ -43,17 +51,16 @@ export async function GET(request: NextRequest) {
       reports.map(r => [r.student_id, r.submitted_at])
     )
 
-    // 创建Excel数据
-    const excelData = students.map(student => ({
-      '学号': student.student_id,
-      '姓名': student.name,
-      '区队': student.squad,
-      '导师': student.advisor,
-      '提交状态': submittedMap.has(student.id) ? '已提交' : '未提交',
-      '提交时间': submittedMap.has(student.id)
-        ? formatDateTime(submittedMap.get(student.id)!)
-        : '',
-    }))
+    // 创建Excel数据 - 只包含未提交的学生
+    const excelData = students
+      .filter(student => !submittedMap.has(student.id))
+      .map(student => ({
+        '学号': student.student_id,
+        '姓名': student.name,
+        '区队': student.squad,
+        '导师': student.advisor,
+        '提交状态': '未提交',
+      }))
 
     // 创建工作簿
     const worksheet = XLSX.utils.json_to_sheet(excelData)
@@ -61,12 +68,20 @@ export async function GET(request: NextRequest) {
     XLSX.utils.book_append_sheet(workbook, worksheet, '未交名单')
 
     // 生成Excel文件
-    const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' })
+    const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx', bookSST: false })
+
+    // 根据区队生成文件名（使用 UTF-8 编码）
+    const filename = squad
+      ? `${squad}_未交名单_第${week}周.xlsx`
+      : `未交名单_第${week}周.xlsx`
+
+    // 对文件名进行 URL 编码以支持中文
+    const encodedFilename = encodeURIComponent(filename)
 
     return new NextResponse(excelBuffer, {
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'Content-Disposition': `attachment; filename="未交名单_第${week}周.xlsx"`,
+        'Content-Disposition': `attachment; filename*=UTF-8''${encodedFilename}`,
       },
     })
   } catch (error) {

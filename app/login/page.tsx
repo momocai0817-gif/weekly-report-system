@@ -90,7 +90,7 @@ export default function LoginPage() {
         <div className="bg-white rounded-2xl shadow-xl p-8">
           {/* 标题 */}
           <div className="text-center mb-8">
-            <h1 className="text-2xl font-bold text-gray-800">论文导师周报系统</h1>
+            <h1 className="text-2xl font-bold text-gray-800">论文指导周报系统</h1>
             <p className="text-gray-500 mt-2">请选择登录方式</p>
           </div>
 

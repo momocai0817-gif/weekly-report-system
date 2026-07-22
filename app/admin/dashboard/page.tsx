@@ -81,25 +81,58 @@ export default function AdminDashboardPage() {
     }
   }
 
-  const handleExportExcel = async () => {
+  const handleExportExcel = async (squad?: string) => {
     try {
-      const response = await fetch(
-        `/api/admin/export/unsubmitted?week=${currentWeek.weekNumber}&year=${currentWeek.year}`
-      )
+      const url = squad
+        ? `/api/admin/export/unsubmitted?week=${currentWeek.weekNumber}&year=${currentWeek.year}&squad=${encodeURIComponent(squad)}`
+        : `/api/admin/export/unsubmitted?week=${currentWeek.weekNumber}&year=${currentWeek.year}`
+
+      const response = await fetch(url)
 
       if (!response.ok) {
         throw new Error('导出失败')
       }
 
       const blob = await response.blob()
-      const url = window.URL.createObjectURL(blob)
+      const blobUrl = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
-      a.href = url
-      a.download = `未交名单_第${currentWeek.weekNumber}周.xlsx`
+      a.href = blobUrl
+      a.download = squad
+        ? `${squad}_未交名单_第${currentWeek.weekNumber}周.xlsx`
+        : `未交名单_第${currentWeek.weekNumber}周.xlsx`
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
-      window.URL.revokeObjectURL(url)
+      window.URL.revokeObjectURL(blobUrl)
+    } catch (err) {
+      console.error('导出失败:', err)
+      alert('导出失败，请稍后重试')
+    }
+  }
+
+  const handleExportSubmitted = async (squad?: string) => {
+    try {
+      const url = squad
+        ? `/api/admin/export/submitted?week=${currentWeek.weekNumber}&year=${currentWeek.year}&squad=${encodeURIComponent(squad)}`
+        : `/api/admin/export/submitted?week=${currentWeek.weekNumber}&year=${currentWeek.year}`
+
+      const response = await fetch(url)
+
+      if (!response.ok) {
+        throw new Error('导出失败')
+      }
+
+      const blob = await response.blob()
+      const blobUrl = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = blobUrl
+      a.download = squad
+        ? `${squad}_已交名单_第${currentWeek.weekNumber}周.xlsx`
+        : `已交名单_第${currentWeek.weekNumber}周.xlsx`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      window.URL.revokeObjectURL(blobUrl)
     } catch (err) {
       console.error('导出失败:', err)
       alert('导出失败，请稍后重试')
@@ -129,7 +162,7 @@ export default function AdminDashboardPage() {
       <header className="bg-white shadow-sm">
         <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
           <div>
-            <h1 className="text-xl font-bold text-gray-800">论文导师周报系统</h1>
+            <h1 className="text-xl font-bold text-gray-800">论文指导周报系统</h1>
             <p className="text-sm text-gray-500">管理端</p>
           </div>
           <div className="flex items-center gap-4">
@@ -233,43 +266,151 @@ export default function AdminDashboardPage() {
               >
                 {copied ? '✓ 已复制' : '📋 复制名单'}
               </button>
+            </div>
+          </div>
+
+          {/* 区队分别导出 */}
+          <div className="mb-4 p-4 bg-gray-50 rounded-lg">
+            <p className="text-sm text-gray-600 mb-3">按区队导出 Excel：</p>
+            <div className="flex gap-3">
               <button
-                onClick={handleExportExcel}
-                disabled={unsubmittedStudents.length === 0}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center gap-2"
+                onClick={() => handleExportExcel('一区队')}
+                disabled={unsubmittedStudents.filter(s => s.squad === '一区队').length === 0}
+                className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center justify-center gap-2"
               >
-                📊 导出Excel
+                📊 导出一区队
+                <span className="text-xs opacity-75">
+                  ({unsubmittedStudents.filter(s => s.squad === '一区队').length}人)
+                </span>
+              </button>
+              <button
+                onClick={() => handleExportExcel('二区队')}
+                disabled={unsubmittedStudents.filter(s => s.squad === '二区队').length === 0}
+                className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center justify-center gap-2"
+              >
+                📊 导出二区队
+                <span className="text-xs opacity-75">
+                  ({unsubmittedStudents.filter(s => s.squad === '二区队').length}人)
+                </span>
+              </button>
+              <button
+                onClick={() => handleExportExcel()}
+                disabled={unsubmittedStudents.length === 0}
+                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center gap-2"
+              >
+                📊 导出全部
               </button>
             </div>
           </div>
 
-          {/* 未交学生列表 */}
-          <div className="space-y-2">
-            {unsubmittedStudents.length === 0 ? (
-              <p className="text-center text-gray-500 py-8">
-                🎉 所有学生都已提交！
-              </p>
-            ) : (
-              unsubmittedStudents.map((student) => (
-                <div
-                  key={student.id}
-                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                >
-                  <div>
-                    <span className="font-medium">{student.name}</span>
-                    <span className="text-gray-500 text-sm ml-2">
-                      ({student.student_id})
-                    </span>
-                    <span className="text-gray-400 text-sm ml-2">
-                      {student.squad}
-                    </span>
+          {/* 未交学生列表 - 按区队分开显示 */}
+          {unsubmittedStudents.length === 0 ? (
+            <p className="text-center text-gray-500 py-8">
+              🎉 所有学生都已提交！
+            </p>
+          ) : (
+            <div className="space-y-4">
+              {/* 一区队 */}
+              {unsubmittedStudents.filter(s => s.squad === '一区队').length > 0 && (
+                <div>
+                  <h4 className="text-sm font-medium text-gray-700 mb-2">
+                    一区队 ({unsubmittedStudents.filter(s => s.squad === '一区队').length}人)
+                  </h4>
+                  <div className="space-y-2">
+                    {unsubmittedStudents
+                      .filter(s => s.squad === '一区队')
+                      .map((student) => (
+                        <div
+                          key={student.id}
+                          className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                        >
+                          <div>
+                            <span className="font-medium text-gray-900">{student.name}</span>
+                            <span className="text-gray-700 text-sm ml-2">
+                              ({student.student_id})
+                            </span>
+                          </div>
+                          <span className="text-sm text-gray-800">
+                            导师：{student.advisor}
+                          </span>
+                        </div>
+                      ))}
                   </div>
-                  <span className="text-sm text-gray-600">
-                    导师：{student.advisor}
-                  </span>
                 </div>
-              ))
-            )}
+              )}
+
+              {/* 二区队 */}
+              {unsubmittedStudents.filter(s => s.squad === '二区队').length > 0 && (
+                <div>
+                  <h4 className="text-sm font-medium text-gray-700 mb-2">
+                    二区队 ({unsubmittedStudents.filter(s => s.squad === '二区队').length}人)
+                  </h4>
+                  <div className="space-y-2">
+                    {unsubmittedStudents
+                      .filter(s => s.squad === '二区队')
+                      .map((student) => (
+                        <div
+                          key={student.id}
+                          className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                        >
+                          <div>
+                            <span className="font-medium text-gray-900">{student.name}</span>
+                            <span className="text-gray-700 text-sm ml-2">
+                              ({student.student_id})
+                            </span>
+                          </div>
+                          <span className="text-sm text-gray-800">
+                            导师：{student.advisor}
+                          </span>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* 已交名单导出 */}
+        <div className="bg-white rounded-xl shadow-sm p-6 mt-6">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="font-medium text-gray-800">
+              已交名单导出
+            </h3>
+          </div>
+
+          {/* 区队分别导出 */}
+          <div className="p-4 bg-gray-50 rounded-lg">
+            <p className="text-sm text-gray-600 mb-3">按区队导出已交人员 Excel（包含问题答案和签名）：</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => handleExportSubmitted('一区队')}
+                disabled={(stats?.squad1Submitted || 0) === 0}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center justify-center gap-2"
+              >
+                📊 导出一区队
+                <span className="text-xs opacity-75">
+                  ({stats?.squad1Submitted || 0}人)
+                </span>
+              </button>
+              <button
+                onClick={() => handleExportSubmitted('二区队')}
+                disabled={(stats?.squad2Submitted || 0) === 0}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center justify-center gap-2"
+              >
+                📊 导出二区队
+                <span className="text-xs opacity-75">
+                  ({stats?.squad2Submitted || 0}人)
+                </span>
+              </button>
+              <button
+                onClick={() => handleExportSubmitted()}
+                disabled={(stats?.submitted || 0) === 0}
+                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center gap-2"
+              >
+                📊 导出全部
+              </button>
+            </div>
           </div>
         </div>
 

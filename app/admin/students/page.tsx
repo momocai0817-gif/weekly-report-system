@@ -146,7 +146,7 @@ export default function AdminStudentsPage() {
       <header className="bg-white shadow-sm">
         <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
           <div>
-            <h1 className="text-xl font-bold text-gray-800">论文导师周报系统</h1>
+            <h1 className="text-xl font-bold text-gray-800">论文指导周报系统</h1>
             <p className="text-sm text-gray-500">学生管理</p>
           </div>
           <button
@@ -189,12 +189,12 @@ export default function AdminStudentsPage() {
                 className="flex items-center justify-between p-4 hover:bg-gray-50"
               >
                 <div className="flex-1">
-                  <span className="font-medium">{student.name}</span>
-                  <span className="text-gray-500 text-sm ml-2">
+                  <span className="font-medium text-gray-900">{student.name}</span>
+                  <span className="text-gray-700 text-sm ml-2">
                     ({student.student_id})
                   </span>
                 </div>
-                <div className="flex-1 text-gray-600">
+                <div className="flex-1 text-gray-800">
                   导师：{student.advisor}
                 </div>
                 <div className="flex gap-2">
@@ -229,12 +229,12 @@ export default function AdminStudentsPage() {
                 className="flex items-center justify-between p-4 hover:bg-gray-50"
               >
                 <div className="flex-1">
-                  <span className="font-medium">{student.name}</span>
-                  <span className="text-gray-500 text-sm ml-2">
+                  <span className="font-medium text-gray-900">{student.name}</span>
+                  <span className="text-gray-700 text-sm ml-2">
                     ({student.student_id})
                   </span>
                 </div>
-                <div className="flex-1 text-gray-600">
+                <div className="flex-1 text-gray-800">
                   导师：{student.advisor}
                 </div>
                 <div className="flex gap-2">
