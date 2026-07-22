@@ -8,11 +8,11 @@ export const createSupabaseClient = () => {
   )
 }
 
-// 服务端Supabase客户端（用于API路由，拥有更高权限）
+// 服务端Supabase客户端（用于API路由）
 export const createServiceClient = () => {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   )
 }
 
