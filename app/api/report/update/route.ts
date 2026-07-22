@@ -46,38 +46,47 @@ export async function POST(request: NextRequest) {
       updateData.not_contacted_reason = !contacted_professor ? not_contacted_reason : null
     }
 
-    // 先尝试更新
-    let { data, error } = await supabase
+    // 执行更新（不返回数据）
+    const { error } = await supabase
       .from('weekly_reports')
       .update(updateData)
       .eq('id', id)
-      .select()
-      .single()
-
-    // 如果错误是因为 not_contacted_reason 字段不存在，则重试不包含该字段
-    if (error && error.message && error.message.includes('not_contacted_reason')) {
-      const { not_contacted_reason: _, ...updateDataRetry } = updateData
-      const result = await supabase
-        .from('weekly_reports')
-        .update(updateDataRetry)
-        .eq('id', id)
-        .select()
-        .single()
-      data = result.data
-      error = result.error
-    }
 
     if (error) {
-      console.error('更新错误:', error)
-      return NextResponse.json(
-        { error: '更新失败' },
-        { status: 500 }
-      )
+      // 如果错误是因为 not_contacted_reason 字段不存在，则重试不包含该字段
+      if (error.message && error.message.includes('not_contacted_reason')) {
+        const { not_contacted_reason: _, ...updateDataRetry } = updateData
+        const retryResult = await supabase
+          .from('weekly_reports')
+          .update(updateDataRetry)
+          .eq('id', id')
+
+        if (retryResult.error) {
+          console.error('更新错误:', retryResult.error)
+          return NextResponse.json(
+            { error: '更新失败' },
+            { status: 500 }
+          )
+        }
+      } else {
+        console.error('更新错误:', error)
+        return NextResponse.json(
+          { error: '更新失败' },
+          { status: 500 }
+        )
+      }
     }
+
+    // 获取更新后的数据
+    const { data: updatedReport } = await supabase
+      .from('weekly_reports')
+      .select('*')
+      .eq('id', id)
+      .single()
 
     return NextResponse.json({
       success: true,
-      report: data,
+      report: updatedReport,
     })
   } catch (error) {
     console.error('更新错误:', error)
