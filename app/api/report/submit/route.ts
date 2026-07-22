@@ -74,14 +74,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (error) {
-      console.error('插入错误:', error)
-      return NextResponse.json(
-        { error: '提交失败，请稍后重试' },
-        { status: 500 }
-      )
-    }
-
     return NextResponse.json({
       success: true,
       report: data,
