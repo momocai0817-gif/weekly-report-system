@@ -35,7 +35,13 @@ export async function GET(request: NextRequest) {
       throw error
     }
 
-    return NextResponse.json({ reports: reports || [] })
+    return NextResponse.json({ reports: reports || [] }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      },
+    })
   } catch (error) {
     console.error('获取周报失败:', error)
     return NextResponse.json(
