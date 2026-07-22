@@ -18,6 +18,8 @@ export async function GET(request: NextRequest) {
 
     const supabase = createServiceClient()
 
+    console.log('导出签名参数:', { week, year, squad })
+
     // 获取本周所有周报
     const { data: reports, error: reportsError } = await supabase
       .from('weekly_reports')
@@ -59,32 +61,49 @@ export async function GET(request: NextRequest) {
     // 创建ZIP文件
     const zip = new JSZip()
 
-    // 按区队分组
-    const squad1Folder = zip.folder('一区队')
-    const squad2Folder = zip.folder('二区队')
+    // 根据区队参数决定创建哪些文件夹
+    if (squad) {
+      // 只添加该区队的签名，直接放在ZIP根目录（不创建区队子文件夹）
+      reports.forEach(report => {
+        const student = studentMap.get(report.student_id)
+        if (!student || !report.signature) return
+        if (student.squad !== squad) return
 
-    // 添加签名图片到对应区队文件夹
-    reports.forEach(report => {
-      const student = studentMap.get(report.student_id)
-      if (!student || !report.signature) return
+        // 文件名：姓名_学号.png
+        const filename = `${student.name}_${student.student_id}.png`
 
-      // 过滤区队
-      if (squad && student.squad !== squad) return
+        // 将base64转换为二进制数据
+        const base64Data = report.signature.replace(/^data:image\/\w+;base64,/, '')
+        const buffer = Buffer.from(base64Data, 'base64')
 
-      // 文件名：姓名_学号.png
-      const filename = `${student.name}_${student.student_id}.png`
+        // 直接添加到ZIP根目录
+        zip.file(filename, buffer)
+      })
+    } else {
+      // 创建两个区队的文件夹
+      const squad1Folder = zip.folder('一区队')
+      const squad2Folder = zip.folder('二区队')
 
-      // 将base64转换为二进制数据
-      const base64Data = report.signature.replace(/^data:image\/\w+;base64,/, '')
-      const buffer = Buffer.from(base64Data, 'base64')
+      // 添加签名图片到对应区队文件夹
+      reports.forEach(report => {
+        const student = studentMap.get(report.student_id)
+        if (!student || !report.signature) return
 
-      // 添加到对应区队文件夹
-      if (student.squad === '一区队') {
-        squad1Folder?.file(filename, buffer)
-      } else if (student.squad === '二区队') {
-        squad2Folder?.file(filename, buffer)
-      }
-    })
+        // 文件名：姓名_学号.png
+        const filename = `${student.name}_${student.student_id}.png`
+
+        // 将base64转换为二进制数据
+        const base64Data = report.signature.replace(/^data:image\/\w+;base64,/, '')
+        const buffer = Buffer.from(base64Data, 'base64')
+
+        // 添加到对应区队文件夹
+        if (student.squad === '一区队') {
+          squad1Folder?.file(filename, buffer)
+        } else if (student.squad === '二区队') {
+          squad2Folder?.file(filename, buffer)
+        }
+      })
+    }
 
     // 生成ZIP文件
     const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' })
