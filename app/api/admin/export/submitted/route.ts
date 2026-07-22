@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase'
-import JSZip from 'jszip'
 import * as XLSX from 'xlsx'
 
 function formatDateTime(date: string): string {
@@ -68,13 +67,6 @@ export async function GET(request: NextRequest) {
       students.map(s => [s.id, s])
     )
 
-    // 创建ZIP文件
-    const zip = new JSZip()
-
-    // 按区队分组
-    const squad1Folder = zip.folder('一区队')
-    const squad2Folder = zip.folder('二区队')
-
     // 生成Excel数据
     const excelData = reports
       .filter(report => {
@@ -111,47 +103,14 @@ export async function GET(request: NextRequest) {
     // 生成Excel文件
     const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx', bookSST: false })
 
-    // 将Excel添加到ZIP根目录
-    const excelFilename = squad
+    // 根据区队生成文件名
+    const filename = squad
       ? `${squad}_已交名单_第${week}周.xlsx`
       : `已交名单_第${week}周.xlsx`
 
-    zip.file(excelFilename, excelBuffer)
-
-    // 添加签名图片到对应区队文件夹
-    reports.forEach(report => {
-      const student = studentMap.get(report.student_id)
-      if (!student || !report.signature) return
-
-      // 过滤区队
-      if (squad && student.squad !== squad) return
-
-      // 文件名：姓名_学号.png
-      const filename = `${student.name}_${student.student_id}.png`
-
-      // 将base64转换为二进制数据
-      const base64Data = report.signature.replace(/^data:image\/\w+;base64,/, '')
-      const buffer = Buffer.from(base64Data, 'base64')
-
-      // 添加到对应区队文件夹
-      if (student.squad === '一区队') {
-        squad1Folder?.file(filename, buffer)
-      } else if (student.squad === '二区队') {
-        squad2Folder?.file(filename, buffer)
-      }
-    })
-
-    // 生成ZIP文件
-    const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' })
-
-    // 根据区队生成文件名
-    const filename = squad
-      ? `${squad}_已交名单_第${week}周.zip`
-      : `已交名单_第${week}周.zip`
-
-    return new NextResponse(new Uint8Array(zipBuffer), {
+    return new NextResponse(new Uint8Array(excelBuffer), {
       headers: {
-        'Content-Type': 'application/zip',
+        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`,
       },
     })
@@ -163,4 +122,3 @@ export async function GET(request: NextRequest) {
     )
   }
 }
-// Wed Jul 22 22:48:48     2026

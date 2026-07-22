@@ -139,6 +139,35 @@ export default function AdminDashboardPage() {
     }
   }
 
+  const handleExportSignatures = async (squad?: string) => {
+    try {
+      const url = squad
+        ? `/api/admin/export/signatures?week=${currentWeek.weekNumber}&year=${currentWeek.year}&squad=${encodeURIComponent(squad)}`
+        : `/api/admin/export/signatures?week=${currentWeek.weekNumber}&year=${currentWeek.year}`
+
+      const response = await fetch(url)
+
+      if (!response.ok) {
+        throw new Error('导出失败')
+      }
+
+      const blob = await response.blob()
+      const blobUrl = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = blobUrl
+      a.download = squad
+        ? `${squad}_签名_第${currentWeek.weekNumber}周.zip`
+        : `签名_第${currentWeek.weekNumber}周.zip`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      window.URL.revokeObjectURL(blobUrl)
+    } catch (err) {
+      console.error('导出失败:', err)
+      alert('导出失败，请稍后重试')
+    }
+  }
+
   const handleLogout = () => {
     localStorage.removeItem('user')
     router.push('/login')
@@ -379,22 +408,56 @@ export default function AdminDashboardPage() {
             </h3>
           </div>
 
-          {/* 区队分别导出 */}
-          <div className="p-4 bg-gray-50 rounded-lg">
-            <p className="text-sm text-gray-600 mb-3">按区队导出ZIP文件（包含Excel名单+一区队/二区队签名文件夹）：</p>
+          {/* Excel导出 */}
+          <div className="mb-4 p-4 bg-gray-50 rounded-lg">
+            <p className="text-sm text-gray-600 mb-3">导出Excel已交人员名单（包含问题答案）：</p>
             <div className="flex gap-3">
               <button
                 onClick={() => handleExportSubmitted('一区队')}
                 disabled={(stats?.squad1Submitted || 0) === 0}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center justify-center gap-2"
+                className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center justify-center gap-2"
               >
-                📦 导出一区队
+                📊 导出一区队
                 <span className="text-xs opacity-75">
                   ({stats?.squad1Submitted || 0}人)
                 </span>
               </button>
               <button
                 onClick={() => handleExportSubmitted('二区队')}
+                disabled={(stats?.squad2Submitted || 0) === 0}
+                className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center justify-center gap-2"
+              >
+                📊 导出二区队
+                <span className="text-xs opacity-75">
+                  ({stats?.squad2Submitted || 0}人)
+                </span>
+              </button>
+              <button
+                onClick={() => handleExportSubmitted()}
+                disabled={(stats?.submitted || 0) === 0}
+                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center gap-2"
+              >
+                📊 导出全部
+              </button>
+            </div>
+          </div>
+
+          {/* 签名导出 */}
+          <div className="p-4 bg-gray-50 rounded-lg">
+            <p className="text-sm text-gray-600 mb-3">导出签名图片ZIP（含一区队/二区队文件夹）：</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => handleExportSignatures('一区队')}
+                disabled={(stats?.squad1Submitted || 0) === 0}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center justify-center gap-2"
+              >
+                📁 导出一区队
+                <span className="text-xs opacity-75">
+                  ({stats?.squad1Submitted || 0}人)
+                </span>
+              </button>
+              <button
+                onClick={() => handleExportSignatures('二区队')}
                 disabled={(stats?.squad2Submitted || 0) === 0}
                 className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center justify-center gap-2"
               >
@@ -404,7 +467,7 @@ export default function AdminDashboardPage() {
                 </span>
               </button>
               <button
-                onClick={() => handleExportSubmitted()}
+                onClick={() => handleExportSignatures()}
                 disabled={(stats?.submitted || 0) === 0}
                 className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center gap-2"
               >
