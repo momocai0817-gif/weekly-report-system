@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
         const retryResult = await supabase
           .from('weekly_reports')
           .update(updateDataRetry)
-          .eq('id', id')
+          .eq('id', id)
 
         if (retryResult.error) {
           console.error('更新错误:', retryResult.error)
