@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase'
-import * as XLSX from 'xlsx'
+import JSZip from 'jszip'
 
 export async function GET(request: NextRequest) {
   try {
@@ -58,55 +58,48 @@ export async function GET(request: NextRequest) {
       students.map(s => [s.id, s])
     )
 
-    // 组合数据并过滤区队
-    const excelData = reports
-      .filter(report => {
-        if (!squad) return true
-        const student = studentMap.get(report.student_id)
-        return student?.squad === squad
-      })
-      .sort((a, b) => {
-        // 按学号排序
-        const studentA = studentMap.get(a.student_id)
-        const studentB = studentMap.get(b.student_id)
-        return (studentA?.student_id || '').localeCompare(studentB?.student_id || '', 'zh-CN', { numeric: true })
-      })
-      .map(report => {
-        const student = studentMap.get(report.student_id)
-        return {
-          '学号': student?.student_id || '',
-          '姓名': student?.name || '',
-          '区队': student?.squad || '',
-          '导师': student?.advisor || '',
-          '提交状态': '已提交',
-          '提交时间': formatDateTime(report.submitted_at),
-          '1.本周是否咨询过导师问题？': report.contacted_professor ? '是' : '否',
-          '2.未咨询原因/所处阶段': !report.contacted_professor ? (report.not_contacted_reason || '') : '',
-          '3.导师是否回复？': report.contacted_professor ? (report.professor_replied ? '是' : '否') : '',
-          '4.具体情况说明': (report.contacted_professor && report.professor_replied) ? (report.reply_details || '') : '',
-          '签名': report.signature || '',
-        }
-      })
+    // 创建ZIP文件
+    const zip = new JSZip()
 
-    // 创建工作簿
-    const worksheet = XLSX.utils.json_to_sheet(excelData)
-    const workbook = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(workbook, worksheet, '已交名单')
+    // 按区队分组
+    const squad1Folder = zip.folder('一区队')
+    const squad2Folder = zip.folder('二区队')
 
-    // 生成Excel文件
-    const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx', bookSST: false })
+    // 添加签名图片到对应文件夹
+    reports.forEach(report => {
+      const student = studentMap.get(report.student_id)
+      if (!student || !report.signature) return
+
+      // 过滤区队
+      if (squad && student.squad !== squad) return
+
+      // 文件名：姓名_学号.png
+      const filename = `${student.name}_${student.student_id}.png`
+
+      // 将base64转换为二进制数据
+      const base64Data = report.signature.replace(/^data:image\/\w+;base64,/, '')
+      const buffer = Buffer.from(base64Data, 'base64')
+
+      // 添加到对应区队文件夹
+      if (student.squad === '一区队') {
+        squad1Folder?.file(filename, buffer)
+      } else if (student.squad === '二区队') {
+        squad2Folder?.file(filename, buffer)
+      }
+    })
+
+    // 生成ZIP文件
+    const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' })
 
     // 根据区队生成文件名
     const filename = squad
-      ? `${squad}_已交名单_第${week}周.xlsx`
-      : `已交名单_第${week}周.xlsx`
+      ? `${squad}_签名_第${week}周.zip`
+      : `签名_第${week}周.zip`
 
-    const encodedFilename = encodeURIComponent(filename)
-
-    return new NextResponse(excelBuffer, {
+    return new NextResponse(zipBuffer, {
       headers: {
-        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'Content-Disposition': `attachment; filename*=UTF-8''${encodedFilename}`,
+        'Content-Type': 'application/zip',
+        'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`,
       },
     })
   } catch (error) {
@@ -116,15 +109,4 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     )
   }
-}
-
-function formatDateTime(date: string): string {
-  const d = new Date(date)
-  return d.toLocaleString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
 }

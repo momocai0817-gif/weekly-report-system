@@ -371,24 +371,24 @@ export default function AdminDashboardPage() {
           )}
         </div>
 
-        {/* 已交名单导出 */}
+        {/* 已交签名导出 */}
         <div className="bg-white rounded-xl shadow-sm p-6 mt-6">
           <div className="flex justify-between items-center mb-4">
             <h3 className="font-medium text-gray-800">
-              已交名单导出
+              签名图片导出
             </h3>
           </div>
 
           {/* 区队分别导出 */}
           <div className="p-4 bg-gray-50 rounded-lg">
-            <p className="text-sm text-gray-600 mb-3">按区队导出已交人员 Excel（包含问题答案和签名）：</p>
+            <p className="text-sm text-gray-600 mb-3">按区队导出签名图片ZIP文件（含一区队、二区队文件夹）：</p>
             <div className="flex gap-3">
               <button
                 onClick={() => handleExportSubmitted('一区队')}
                 disabled={(stats?.squad1Submitted || 0) === 0}
                 className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center justify-center gap-2"
               >
-                📊 导出一区队
+                📁 导出一区队
                 <span className="text-xs opacity-75">
                   ({stats?.squad1Submitted || 0}人)
                 </span>
@@ -398,7 +398,7 @@ export default function AdminDashboardPage() {
                 disabled={(stats?.squad2Submitted || 0) === 0}
                 className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center justify-center gap-2"
               >
-                📊 导出二区队
+                📁 导出二区队
                 <span className="text-xs opacity-75">
                   ({stats?.squad2Submitted || 0}人)
                 </span>
@@ -408,7 +408,7 @@ export default function AdminDashboardPage() {
                 disabled={(stats?.submitted || 0) === 0}
                 className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center gap-2"
               >
-                📊 导出全部
+                📁 导出全部
               </button>
             </div>
           </div>
