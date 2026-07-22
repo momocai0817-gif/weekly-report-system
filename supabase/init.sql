@@ -122,6 +122,17 @@ BEGIN
     RAISE NOTICE 'signature 字段已添加';
   END IF;
 
+  -- 添加 not_contacted_reason 字段（如果不存在）
+  IF NOT EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_name = 'weekly_reports'
+    AND column_name = 'not_contacted_reason'
+  ) THEN
+    ALTER TABLE weekly_reports ADD COLUMN not_contacted_reason TEXT;
+    RAISE NOTICE 'not_contacted_reason 字段已添加';
+  END IF;
+
   -- 删除旧的 screenshot_urls 字段（如果存在）
   IF EXISTS (
     SELECT 1
