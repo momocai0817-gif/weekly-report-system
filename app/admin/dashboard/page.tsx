@@ -192,7 +192,7 @@ export default function AdminDashboardPage() {
         <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
           <div>
             <h1 className="text-xl font-bold text-gray-800">论文指导周报系统</h1>
-            <p className="text-sm text-gray-500">管理端</p>
+            <p className="text-sm text-gray-800">管理端</p>
           </div>
           <div className="flex items-center gap-4">
             <span className="text-sm font-medium">{user?.name}</span>
@@ -240,7 +240,7 @@ export default function AdminDashboardPage() {
             <h3 className="font-medium text-gray-800 mb-4">一区队</h3>
             <div className="space-y-2">
               <div className="flex justify-between">
-                <span className="text-gray-600">总人数</span>
+                <span className="text-gray-800">总人数</span>
                 <span className="font-medium">{stats?.squad1Total || 0}</span>
               </div>
               <div className="flex justify-between">
@@ -262,7 +262,7 @@ export default function AdminDashboardPage() {
             <h3 className="font-medium text-gray-800 mb-4">二区队</h3>
             <div className="space-y-2">
               <div className="flex justify-between">
-                <span className="text-gray-600">总人数</span>
+                <span className="text-gray-800">总人数</span>
                 <span className="font-medium">{stats?.squad2Total || 0}</span>
               </div>
               <div className="flex justify-between">
@@ -342,7 +342,7 @@ export default function AdminDashboardPage() {
               {/* 一区队 */}
               {unsubmittedStudents.filter(s => s.squad === '一区队').length > 0 && (
                 <div>
-                  <h4 className="text-sm font-medium text-gray-700 mb-2">
+                  <h4 className="text-base font-semibold text-gray-900 mb-3">
                     一区队 ({unsubmittedStudents.filter(s => s.squad === '一区队').length}人)
                   </h4>
                   <div className="space-y-2">
@@ -371,7 +371,7 @@ export default function AdminDashboardPage() {
               {/* 二区队 */}
               {unsubmittedStudents.filter(s => s.squad === '二区队').length > 0 && (
                 <div>
-                  <h4 className="text-sm font-medium text-gray-700 mb-2">
+                  <h4 className="text-base font-semibold text-gray-900 mb-3">
                     二区队 ({unsubmittedStudents.filter(s => s.squad === '二区队').length}人)
                   </h4>
                   <div className="space-y-2">
