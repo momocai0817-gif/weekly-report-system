@@ -241,7 +241,7 @@ export default function AdminDashboardPage() {
             <div className="space-y-2">
               <div className="flex justify-between">
                 <span className="text-gray-800">总人数</span>
-                <span className="font-medium">{stats?.squad1Total || 0}</span>
+                <span className="font-medium text-gray-900">{stats?.squad1Total || 0}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">已提交</span>
@@ -263,7 +263,7 @@ export default function AdminDashboardPage() {
             <div className="space-y-2">
               <div className="flex justify-between">
                 <span className="text-gray-800">总人数</span>
-                <span className="font-medium">{stats?.squad2Total || 0}</span>
+                <span className="font-medium text-gray-900">{stats?.squad2Total || 0}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">已提交</span>
