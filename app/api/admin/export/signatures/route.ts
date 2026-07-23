@@ -63,7 +63,10 @@ export async function GET(request: NextRequest) {
 
     // 根据区队参数决定创建哪些文件夹
     if (squad) {
-      // 只添加该区队的签名，直接放在ZIP根目录（不创建区队子文件夹）
+      // 创建指定区队的文件夹
+      const squadFolder = zip.folder(squad)
+
+      // 只添加该区队的签名
       reports.forEach(report => {
         const student = studentMap.get(report.student_id)
         if (!student || !report.signature) return
@@ -76,8 +79,8 @@ export async function GET(request: NextRequest) {
         const base64Data = report.signature.replace(/^data:image\/\w+;base64,/, '')
         const buffer = Buffer.from(base64Data, 'base64')
 
-        // 直接添加到ZIP根目录
-        zip.file(filename, buffer)
+        // 添加到区队文件夹
+        squadFolder?.file(filename, buffer)
       })
     } else {
       // 创建两个区队的文件夹
