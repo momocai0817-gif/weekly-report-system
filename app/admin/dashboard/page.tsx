@@ -192,7 +192,7 @@ export default function AdminDashboardPage() {
         <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
           <div>
             <h1 className="text-xl font-bold text-gray-800">论文指导周报系统</h1>
-            <p className="text-sm text-gray-900">管理员</p>
+            <p className="text-sm text-gray-900">管理端</p>
           </div>
           <div className="flex items-center gap-4">
             <span className="text-sm font-medium">{user?.name}</span>
