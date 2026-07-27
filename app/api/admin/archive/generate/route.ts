@@ -39,18 +39,18 @@ async function generateUnsubmittedExcel(
 
   if (reportsError) throw reportsError
 
-  const submittedIds = new Set(reports?.map(r => r.student_id) || [])
+  const submittedIds = new Set(reports?.map((r: any) => r.student_id) || [])
 
   // 创建未交名单数据
   const excelData = students
-    .filter(student => !submittedIds.has(student.id))
-    .map(student => ({
+    ?.filter((student: any) => !submittedIds.has(student.id))
+    .map((student: any) => ({
       '学号': student.student_id,
       '姓名': student.name,
       '区队': student.squad,
       '导师': student.advisor,
       '提交状态': '未提交',
-    }))
+    })) || []
 
   const worksheet = XLSX.utils.json_to_sheet(excelData)
   const workbook = XLSX.utils.book_new()
@@ -79,7 +79,7 @@ async function generateSubmittedExcel(
   }
 
   // 获取学生信息
-  const studentIds = reports.map(r => r.student_id)
+  const studentIds = reports.map((r: any) => r.student_id)
   const { data: students, error: studentsError } = await supabase
     .from('students')
     .select('id, name, student_id, squad, advisor')
@@ -87,17 +87,17 @@ async function generateSubmittedExcel(
 
   if (studentsError) throw studentsError
 
-  const studentMap = new Map(students?.map(s => [s.id, s]) || [])
+  const studentMap = new Map(students?.map((s: any) => [s.id, s]) || [])
 
   // 创建已交名单数据
   const excelData = reports
-    .sort((a, b) => {
-      const studentA = studentMap.get(a.student_id)
-      const studentB = studentMap.get(b.student_id)
+    .sort((a: any, b: any) => {
+      const studentA = studentMap.get(a.student_id) as any
+      const studentB = studentMap.get(b.student_id) as any
       return (studentA?.student_id || '').localeCompare(studentB?.student_id || '', 'zh-CN', { numeric: true })
     })
-    .map(report => {
-      const student = studentMap.get(report.student_id)
+    .map((report: any) => {
+      const student = studentMap.get(report.student_id) as any
       return {
         '学号': student?.student_id || '',
         '姓名': student?.name || '',
@@ -140,7 +140,7 @@ async function generateSignaturesZip(
   }
 
   // 获取学生信息
-  const studentIds = reports.map(r => r.student_id).filter(id => id)
+  const studentIds = reports.map((r: any) => r.student_id).filter((id: any) => id)
   const { data: students, error: studentsError } = await supabase
     .from('students')
     .select('id, name, student_id, squad')
@@ -148,7 +148,7 @@ async function generateSignaturesZip(
 
   if (studentsError) throw studentsError
 
-  const studentMap = new Map(students?.map(s => [s.id, s]) || [])
+  const studentMap = new Map(students?.map((s: any) => [s.id, s]) || [])
 
   // 创建ZIP文件
   const zip = new JSZip()
@@ -156,8 +156,8 @@ async function generateSignaturesZip(
   const squad2Folder = zip.folder('二区队')
 
   // 添加签名图片
-  reports.forEach(report => {
-    const student = studentMap.get(report.student_id)
+  reports.forEach((report: any) => {
+    const student = studentMap.get(report.student_id) as any
     if (!student || !report.signature) return
 
     const filename = `${student.name}_${student.student_id}.png`

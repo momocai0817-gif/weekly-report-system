@@ -37,17 +37,17 @@ async function generateUnsubmittedExcel(
 
   if (reportsError) throw reportsError
 
-  const submittedIds = new Set(reports?.map(r => r.student_id) || [])
+  const submittedIds = new Set(reports?.map((r: any) => r.student_id) || [])
 
   const excelData = students
-    .filter(student => !submittedIds.has(student.id))
-    .map(student => ({
+    ?.filter((student: any) => !submittedIds.has(student.id))
+    .map((student: any) => ({
       '学号': student.student_id,
       '姓名': student.name,
       '区队': student.squad,
       '导师': student.advisor,
       '提交状态': '未提交',
-    }))
+    })) || []
 
   const worksheet = XLSX.utils.json_to_sheet(excelData)
   const workbook = XLSX.utils.book_new()
@@ -74,7 +74,7 @@ async function generateSubmittedExcel(
     throw new Error('该周暂无提交记录')
   }
 
-  const studentIds = reports.map(r => r.student_id)
+  const studentIds = reports.map((r: any) => r.student_id)
   const { data: students, error: studentsError } = await supabase
     .from('students')
     .select('id, name, student_id, squad, advisor')
@@ -82,16 +82,16 @@ async function generateSubmittedExcel(
 
   if (studentsError) throw studentsError
 
-  const studentMap = new Map(students?.map(s => [s.id, s]) || [])
+  const studentMap = new Map(students?.map((s: any) => [s.id, s]) || [])
 
   const excelData = reports
-    .sort((a, b) => {
-      const studentA = studentMap.get(a.student_id)
-      const studentB = studentMap.get(b.student_id)
+    .sort((a: any, b: any) => {
+      const studentA = studentMap.get(a.student_id) as any
+      const studentB = studentMap.get(b.student_id) as any
       return (studentA?.student_id || '').localeCompare(studentB?.student_id || '', 'zh-CN', { numeric: true })
     })
-    .map(report => {
-      const student = studentMap.get(report.student_id)
+    .map((report: any) => {
+      const student = studentMap.get(report.student_id) as any
       return {
         '学号': student?.student_id || '',
         '姓名': student?.name || '',
@@ -132,7 +132,7 @@ async function generateSignaturesZip(
     throw new Error('该周暂无提交记录')
   }
 
-  const studentIds = reports.map(r => r.student_id).filter(id => id)
+  const studentIds = reports.map((r: any) => r.student_id).filter((id: any) => id)
   const { data: students, error: studentsError } = await supabase
     .from('students')
     .select('id, name, student_id, squad')
@@ -140,14 +140,14 @@ async function generateSignaturesZip(
 
   if (studentsError) throw studentsError
 
-  const studentMap = new Map(students?.map(s => [s.id, s]) || [])
+  const studentMap = new Map(students?.map((s: any) => [s.id, s]) || [])
 
   const zip = new JSZip()
   const squad1Folder = zip.folder('一区队')
   const squad2Folder = zip.folder('二区队')
 
-  reports.forEach(report => {
-    const student = studentMap.get(report.student_id)
+  reports.forEach((report: any) => {
+    const student = studentMap.get(report.student_id) as any
     if (!student || !report.signature) return
 
     const filename = `${student.name}_${student.student_id}.png`
@@ -187,7 +187,7 @@ function extractStoragePath(url: string): string | null {
     const urlObj = new URL(url)
     const pathParts = urlObj.pathname.split('/')
     // 找到 bucket 之后的部分
-    const bucketIndex = pathParts.findIndex(p => p === 'weekly-archives')
+    const bucketIndex = pathParts.findIndex((p: string) => p === 'weekly-archives')
     if (bucketIndex >= 0 && bucketIndex + 1 < pathParts.length) {
       return pathParts.slice(bucketIndex + 1).join('/')
     }
@@ -231,9 +231,9 @@ export async function GET(request: NextRequest) {
       // 归档存在，从Storage下载
       console.log('从Storage下载归档文件...')
 
-      const unsubmittedPath = extractStoragePath(existingArchive.unsubmitted_file_url)
-      const submittedPath = extractStoragePath(existingArchive.submitted_file_url)
-      const signaturesPath = extractStoragePath(existingArchive.signatures_file_url)
+      const unsubmittedPath = extractStoragePath(existingArchive.unsubmitted_file_url || '')
+      const submittedPath = extractStoragePath(existingArchive.submitted_file_url || '')
+      const signaturesPath = extractStoragePath(existingArchive.signatures_file_url || '')
 
       if (unsubmittedPath && submittedPath && signaturesPath) {
         unsubmittedBuffer = await downloadFromStorage(supabase, 'weekly-archives', unsubmittedPath)
