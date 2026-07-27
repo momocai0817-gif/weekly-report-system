@@ -16,16 +16,22 @@ export function getCurrentWeek(): { weekNumber: number; year: number } {
   const targetDay = daysOfWeek.indexOf(day)
 
   const currentDay = now.getDay()
-  const daysUntilTarget = (targetDay - currentDay + 7) % 7
+
+  // 计算本周截止日期（最近的周日，可能是今天或之前）
+  // 如果今天是周日，截止日期就是今天；否则截止日期是上一个周日
+  let daysSinceTarget = currentDay - targetDay
+  if (daysSinceTarget < 0) {
+    daysSinceTarget += 7
+  }
 
   // 计算本周截止日期
   const deadlineDate = new Date(now)
-  deadlineDate.setDate(now.getDate() + daysUntilTarget)
-  deadlineDate.setHours(hour, minute, 59, 999)  // 设置到截止秒的最后一毫秒
+  deadlineDate.setDate(now.getDate() - daysSinceTarget)
+  deadlineDate.setHours(hour, minute, 59, 999)
 
-  // 如果当前时间已过本周截止时间，使用下周日期来计算周次
+  // 如果当前时间已过本周截止时间，使用下一周日期来计算周次
   const displayDate = now.getTime() > deadlineDate.getTime()
-    ? new Date(now.getTime() + 24 * 60 * 60 * 1000)  // 加一天
+    ? new Date(now.getTime() + 24 * 60 * 60 * 1000)
     : now
 
   const startDate = new Date(process.env.SEMESTER_START_DATE || '2025-02-24')
