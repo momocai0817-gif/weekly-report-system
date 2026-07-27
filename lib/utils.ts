@@ -7,19 +7,38 @@ export function cn(...inputs: ClassValue[]) {
 
 // 计算当前是第几周（基于学期开始日期）
 export function getCurrentWeek(): { weekNumber: number; year: number } {
-  const startDate = new Date(process.env.SEMESTER_START_DATE || '2025-02-24')
-  const now = new Date()
+  const deadline = process.env.WEEKLY_DEADLINE || 'Sunday 23:59'
+  const [day, time] = deadline.split(' ')
+  const [hour, minute] = time.split(':').map(Number)
 
-  const year = now.getFullYear()
+  const now = new Date()
+  const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+  const targetDay = daysOfWeek.indexOf(day)
+
+  const currentDay = now.getDay()
+  const daysUntilTarget = (targetDay - currentDay + 7) % 7
+
+  // 计算本周截止日期
+  const deadlineDate = new Date(now)
+  deadlineDate.setDate(now.getDate() + daysUntilTarget)
+  deadlineDate.setHours(hour, minute, 59, 999)  // 设置到截止秒的最后一毫秒
+
+  // 如果当前时间已过本周截止时间，使用下周日期来计算周次
+  const displayDate = now.getTime() > deadlineDate.getTime()
+    ? new Date(now.getTime() + 24 * 60 * 60 * 1000)  // 加一天
+    : now
+
+  const startDate = new Date(process.env.SEMESTER_START_DATE || '2025-02-24')
+  const year = displayDate.getFullYear()
   const startOfYear = new Date(year, 0, 1)
   const startDateThisYear = new Date(year, startDate.getMonth(), startDate.getDate())
 
   // 如果当前日期在本学期开始之前，使用去年的学期开始日期
-  const actualStartDate = now < startDateThisYear
+  const actualStartDate = displayDate < startDateThisYear
     ? new Date(year - 1, startDate.getMonth(), startDate.getDate())
     : startDateThisYear
 
-  const diffTime = now.getTime() - actualStartDate.getTime()
+  const diffTime = displayDate.getTime() - actualStartDate.getTime()
   const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24))
   const weekNumber = Math.floor(diffDays / 7) + 1
 

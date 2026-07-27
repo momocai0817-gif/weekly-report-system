@@ -10,6 +10,8 @@ interface WeekSummary {
   total: number
   submitted: number
   rate: number
+  hasArchive: boolean
+  archiveId?: string
 }
 
 export default function AdminArchivePage() {
@@ -17,6 +19,7 @@ export default function AdminArchivePage() {
   const [user, setUser] = useState<any>(null)
   const [summaries, setSummaries] = useState<WeekSummary[]>([])
   const [loading, setLoading] = useState(true)
+  const [exporting, setExporting] = useState<string | null>(null)
 
   const currentWeek = getCurrentWeek()
 
@@ -42,7 +45,31 @@ export default function AdminArchivePage() {
     try {
       const response = await fetch('/api/admin/archive')
       const data = await response.json()
-      setSummaries(data.summaries || [])
+
+      // 获取归档状态
+      const summariesWithArchive = await Promise.all(
+        (data.summaries || []).map(async (summary: WeekSummary) => {
+          try {
+            const archiveResponse = await fetch(
+              `/api/admin/archive/generate?week=${summary.week}&year=${summary.year}`
+            )
+            const archiveData = await archiveResponse.json()
+
+            return {
+              ...summary,
+              hasArchive: !!archiveData.archive,
+              archiveId: archiveData.archive?.id,
+            }
+          } catch {
+            return {
+              ...summary,
+              hasArchive: false,
+            }
+          }
+        })
+      )
+
+      setSummaries(summariesWithArchive)
     } catch (err) {
       console.error('获取归档数据失败:', err)
     } finally {
@@ -56,6 +83,38 @@ export default function AdminArchivePage() {
 
   const handleViewWeek = (week: number, year: number) => {
     router.push(`/admin/reports?week=${week}&year=${year}`)
+  }
+
+  const handleExportAll = async (week: number, year: number) => {
+    const exportKey = `${year}-${week}`
+    setExporting(exportKey)
+
+    try {
+      const response = await fetch(
+        `/api/admin/archive/export-all?week=${week}&year=${year}`
+      )
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || '导出失败')
+      }
+
+      // 下载文件
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `第${week}周_全部归档_${year}年.zip`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+    } catch (err: any) {
+      console.error('导出失败:', err)
+      alert(`导出失败: ${err.message}`)
+    } finally {
+      setExporting(null)
+    }
   }
 
   return (
@@ -120,15 +179,35 @@ export default function AdminArchivePage() {
                         <span>
                           提交率: <span className="font-medium">{summary.rate}%</span>
                         </span>
+                        {summary.hasArchive && (
+                          <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
+                            已归档
+                          </span>
+                        )}
                       </div>
                     </div>
 
-                    <button
-                      onClick={() => handleViewWeek(summary.week, summary.year)}
-                      className="px-3 py-1 text-sm text-blue-600 hover:text-blue-800 border border-blue-600 rounded hover:bg-blue-50 transition"
-                    >
-                      查看详情
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleViewWeek(summary.week, summary.year)}
+                        className="px-3 py-1 text-sm text-blue-600 hover:text-blue-800 border border-blue-600 rounded hover:bg-blue-50 transition"
+                      >
+                        查看详情
+                      </button>
+                      <button
+                        onClick={() => handleExportAll(summary.week, summary.year)}
+                        disabled={
+                          exporting === `${summary.year}-${summary.week}` ||
+                          (summary.week === currentWeek.weekNumber &&
+                            summary.year === currentWeek.year)
+                        }
+                        className="px-3 py-1 text-sm text-green-600 hover:text-green-800 border border-green-600 rounded hover:bg-green-50 transition disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
+                      >
+                        {exporting === `${summary.year}-${summary.week}`
+                          ? '导出中...'
+                          : '一键导出'}
+                      </button>
+                    </div>
                   </div>
                 )
               })}
