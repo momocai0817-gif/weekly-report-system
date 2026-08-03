@@ -159,11 +159,11 @@ export async function GET(request: NextRequest) {
       { wch: 12 },  // 学号
       { wch: 10 },  // 姓名
       { wch: 10 },  // 区队
-      { wch: 15 },  // 导师
+      { wch: 10 },  // 导师（缩小）
       { wch: 18 },  // 提交时间
-      { wch: 18 },  // 问题1
+      { wch: 10 },  // 问题1（缩小）
       { wch: 25 },  // 问题2
-      { wch: 12 },  // 问题3
+      { wch: 8 },   // 问题3（缩小）
       { wch: 50 },  // 问题4 - 具体情况说明（加宽）
     ]
     XLSX.utils.book_append_sheet(workbook, totalWorksheet, '总表')
@@ -186,11 +186,11 @@ export async function GET(request: NextRequest) {
         { wch: 12 },  // 学号
         { wch: 10 },  // 姓名
         { wch: 10 },  // 区队
-        { wch: 15 },  // 导师
+        { wch: 10 },  // 导师（缩小）
         { wch: 18 },  // 提交时间
-        { wch: 18 },  // 问题1
+        { wch: 10 },  // 问题1（缩小）
         { wch: 25 },  // 问题2
-        { wch: 12 },  // 问题3
+        { wch: 8 },   // 问题3（缩小）
         { wch: 50 },  // 问题4 - 具体情况说明（加宽）
       ]
       XLSX.utils.book_append_sheet(workbook, advisorWorksheet, sheetName)
