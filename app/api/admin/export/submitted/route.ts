@@ -159,27 +159,21 @@ export async function GET(request: NextRequest) {
     const totalWorksheet = XLSX.utils.json_to_sheet(excelData)
     XLSX.utils.book_append_sheet(workbook, totalWorksheet, '总表')
 
-    // 如果是全部导出（无区队过滤），添加按导师分组的sheet
-    if (!squad) {
-      const advisorGroups = generateAdvisorSheets(reports, studentMap)
+    // 添加按导师分组的sheet（无论是否有区队过滤）
+    const advisorGroups = generateAdvisorSheets(reports, studentMap)
 
-      // 按导师名字排序
-      const sortedAdvisors = Array.from(advisorGroups.keys()).sort((a, b) =>
-        a.localeCompare(b, 'zh-CN')
-      )
+    // 按导师名字排序
+    const sortedAdvisors = Array.from(advisorGroups.keys()).sort((a, b) =>
+      a.localeCompare(b, 'zh-CN')
+    )
 
-      sortedAdvisors.forEach((advisor) => {
-        const advisorData = advisorGroups.get(advisor)!
-        // sheet名称不能超过31个字符
-        const sheetName = advisor.length > 28 ? advisor.substring(0, 28) : advisor
-        const advisorWorksheet = XLSX.utils.json_to_sheet(advisorData)
-        XLSX.utils.book_append_sheet(workbook, advisorWorksheet, sheetName)
-      })
-    } else {
-      // 按区队导出时，只添加总表（保持简单）
-      const worksheet = XLSX.utils.json_to_sheet(excelData)
-      XLSX.utils.book_append_sheet(workbook, worksheet, '已交名单')
-    }
+    sortedAdvisors.forEach((advisor) => {
+      const advisorData = advisorGroups.get(advisor)!
+      // sheet名称不能超过31个字符
+      const sheetName = advisor.length > 28 ? advisor.substring(0, 28) : advisor
+      const advisorWorksheet = XLSX.utils.json_to_sheet(advisorData)
+      XLSX.utils.book_append_sheet(workbook, advisorWorksheet, sheetName)
+    })
 
     // 生成Excel文件
     const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx', bookSST: false })
