@@ -66,12 +66,21 @@ export async function GET(request: NextRequest) {
       .eq('year', parseInt(year))
 
     // 同时查询下一周的数据（因为周一0:00后提交的会被计入下一周）
-    const nextWeek = parseInt(week) + 1
+    // 计算下一周周次
+    let nextWeek = parseInt(week) + 1
+    let nextYear = parseInt(year)
+
+    // 如果超过52周，进入下一年
+    if (nextWeek > 52) {
+      nextWeek = 1
+      nextYear = parseInt(year) + 1
+    }
+
     const { data: nextWeekReports } = await supabase
       .from('weekly_reports')
       .select('student_id, submitted_at')
       .eq('week_number', nextWeek)
-      .eq('year', parseInt(year))
+      .eq('year', nextYear)
 
     if (weekError) {
       reportsError = weekError

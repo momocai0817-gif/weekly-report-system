@@ -69,12 +69,19 @@ export async function GET(request: NextRequest) {
       .eq('week_number', parseInt(week))
       .eq('year', parseInt(year))
 
-    const nextWeek = parseInt(week) + 1
+    // 计算下一周周次（处理跨年）
+    let nextWeek = parseInt(week) + 1
+    let nextYear = parseInt(year)
+    if (nextWeek > 52) {
+      nextWeek = 1
+      nextYear = parseInt(year) + 1
+    }
+
     const { data: nextWeekReports } = await supabase
       .from('weekly_reports')
       .select('*')
       .eq('week_number', nextWeek)
-      .eq('year', parseInt(year))
+      .eq('year', nextYear)
 
     if (weekError) {
       console.error('查询周报错误:', weekError)
