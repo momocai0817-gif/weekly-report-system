@@ -13,6 +13,16 @@ function formatDateTime(date: string): string {
   })
 }
 
+// 创建自动换行样式
+function createWrapCellStyle() {
+  return {
+    alignment: {
+      wrapText: true,
+      vertical: 'top',
+    },
+  }
+}
+
 // 按导师分组生成数据
 function generateAdvisorSheets(
   reports: any[],
@@ -154,18 +164,37 @@ export async function GET(request: NextRequest) {
 
     // 添加总表（第一个sheet）
     const totalWorksheet = XLSX.utils.json_to_sheet(excelData)
-    // 设置列宽："4.具体情况说明"列（I列，索引8）设置为50字符宽度
+
+    // 设置列宽
     totalWorksheet['!cols'] = [
       { wch: 12 },  // 学号
       { wch: 10 },  // 姓名
       { wch: 10 },  // 区队
-      { wch: 10 },  // 导师（缩小）
+      { wch: 10 },  // 导师
       { wch: 18 },  // 提交时间
-      { wch: 10 },  // 问题1（缩小）
-      { wch: 25 },  // 问题2
-      { wch: 8 },   // 问题3（缩小）
+      { wch: 10 },  // 问题1
+      { wch: 40 },  // 问题2（加宽以显示更多文字）
+      { wch: 8 },   // 问题3
       { wch: 50 },  // 问题4 - 具体情况说明（加宽）
     ]
+
+    // 为包含文字的列（G列=问题2，I列=问题4）设置自动换行样式
+    if (totalWorksheet['!ref']) {
+      const range = XLSX.utils.decode_range(totalWorksheet['!ref'])
+      for (let R = range.s.r; R <= range.e.r; ++R) {
+      // G列（索引6）：问题2
+      const cellAddressG = XLSX.utils.encode_cell({ r: R, c: 6 })
+      if (totalWorksheet[cellAddressG]) {
+        totalWorksheet[cellAddressG].s = createWrapCellStyle()
+      }
+      // I列（索引8）：问题4
+      const cellAddressI = XLSX.utils.encode_cell({ r: R, c: 8 })
+      if (totalWorksheet[cellAddressI]) {
+        totalWorksheet[cellAddressI].s = createWrapCellStyle()
+      }
+      }
+    }
+
     XLSX.utils.book_append_sheet(workbook, totalWorksheet, '总表')
 
     // 添加按导师分组的sheet（无论是否有区队过滤）
@@ -181,18 +210,37 @@ export async function GET(request: NextRequest) {
       // sheet名称不能超过31个字符
       const sheetName = advisor.length > 28 ? advisor.substring(0, 28) : advisor
       const advisorWorksheet = XLSX.utils.json_to_sheet(advisorData)
-      // 设置列宽："4.具体情况说明"列（I列，索引8）设置为50字符宽度
+
+      // 设置列宽
       advisorWorksheet['!cols'] = [
         { wch: 12 },  // 学号
         { wch: 10 },  // 姓名
         { wch: 10 },  // 区队
-        { wch: 10 },  // 导师（缩小）
+        { wch: 10 },  // 导师
         { wch: 18 },  // 提交时间
-        { wch: 10 },  // 问题1（缩小）
-        { wch: 25 },  // 问题2
-        { wch: 8 },   // 问题3（缩小）
+        { wch: 10 },  // 问题1
+        { wch: 40 },  // 问题2（加宽以显示更多文字）
+        { wch: 8 },   // 问题3
         { wch: 50 },  // 问题4 - 具体情况说明（加宽）
       ]
+
+      // 为包含文字的列（G列=问题2，I列=问题4）设置自动换行样式
+      if (advisorWorksheet['!ref']) {
+        const range = XLSX.utils.decode_range(advisorWorksheet['!ref'])
+        for (let R = range.s.r; R <= range.e.r; ++R) {
+        // G列（索引6）：问题2
+        const cellAddressG = XLSX.utils.encode_cell({ r: R, c: 6 })
+        if (advisorWorksheet[cellAddressG]) {
+          advisorWorksheet[cellAddressG].s = createWrapCellStyle()
+        }
+        // I列（索引8）：问题4
+        const cellAddressI = XLSX.utils.encode_cell({ r: R, c: 8 })
+        if (advisorWorksheet[cellAddressI]) {
+          advisorWorksheet[cellAddressI].s = createWrapCellStyle()
+        }
+        }
+      }
+
       XLSX.utils.book_append_sheet(workbook, advisorWorksheet, sheetName)
     })
 
