@@ -7,7 +7,7 @@ export function cn(...inputs: ClassValue[]) {
 
 // 计算当前是第几周（基于学期开始日期）
 export function getCurrentWeek(): { weekNumber: number; year: number } {
-  const deadline = process.env.WEEKLY_DEADLINE || 'Sunday 23:59'
+  const deadline = process.env.WEEKLY_DEADLINE || 'Monday 23:59'
   const [day, time] = deadline.split(' ')
   const [hour, minute] = time.split(':').map(Number)
 
@@ -92,7 +92,7 @@ export function getWeekRange(weekNumber: number, year: number): { start: Date; e
 
 // 检查是否已过截止时间
 export function isPastDeadline(): boolean {
-  const deadline = process.env.WEEKLY_DEADLINE || 'Sunday 23:59'
+  const deadline = process.env.WEEKLY_DEADLINE || 'Monday 23:59'
   const now = new Date()
 
   // 解析截止时间
