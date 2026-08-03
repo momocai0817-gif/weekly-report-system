@@ -82,19 +82,14 @@ export async function GET(request: NextRequest) {
     }
 
     // 合并数据，去重（同一学生只保留最新的提交）
-    const studentMap = new Map()
+    const reportMap = new Map()
     ;[...(weekReports || []), ...(nextWeekReports || [])].forEach((r: any) => {
-      const existing = studentMap.get(r.student_id)
+      const existing = reportMap.get(r.student_id)
       if (!existing || new Date(r.submitted_at) > new Date(existing.submitted_at)) {
-        studentMap.set(r.student_id, r)
+        reportMap.set(r.student_id, r)
       }
     })
-    const reports = Array.from(studentMap.values())
-
-    if (!reports || reports.length === 0) {
-      console.error('查询周报错误:', reportsError)
-      throw reportsError
-    }
+    const reports = Array.from(reportMap.values())
 
     if (!reports || reports.length === 0) {
       return NextResponse.json(
