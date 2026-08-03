@@ -34,13 +34,11 @@ function generateAdvisorSheets(
       '姓名': student.name,
       '区队': student.squad,
       '导师': advisor,
-      '提交状态': '已提交',
       '提交时间': formatDateTime(report.submitted_at),
       '1.本周是否咨询过导师问题？': report.contacted_professor ? '是' : '否',
       '2.未咨询原因/所处阶段': !report.contacted_professor ? (report.not_contacted_reason || '') : '',
       '3.导师是否回复？': report.contacted_professor ? (report.professor_replied ? '是' : '否') : '',
       '4.具体情况说明': report.contacted_professor && report.professor_replied ? (report.reply_details || '') : '',
-      '签名': report.signature ? '已签名' : '未签名',
     })
   })
 
@@ -143,13 +141,11 @@ export async function GET(request: NextRequest) {
           '姓名': student?.name || '',
           '区队': student?.squad || '',
           '导师': student?.advisor || '',
-          '提交状态': '已提交',
           '提交时间': formatDateTime(report.submitted_at),
           '1.本周是否咨询过导师问题？': report.contacted_professor ? '是' : '否',
           '2.未咨询原因/所处阶段': !report.contacted_professor ? (report.not_contacted_reason || '') : '',
           '3.导师是否回复？': report.contacted_professor ? (report.professor_replied ? '是' : '否') : '',
           '4.具体情况说明': (report.contacted_professor && report.professor_replied) ? (report.reply_details || '') : '',
-          '签名': report.signature ? '已签名' : '未签名',
         }
       })
 
@@ -158,6 +154,18 @@ export async function GET(request: NextRequest) {
 
     // 添加总表（第一个sheet）
     const totalWorksheet = XLSX.utils.json_to_sheet(excelData)
+    // 设置列宽："4.具体情况说明"列（I列，索引8）设置为50字符宽度
+    totalWorksheet['!cols'] = [
+      { wch: 12 },  // 学号
+      { wch: 10 },  // 姓名
+      { wch: 10 },  // 区队
+      { wch: 15 },  // 导师
+      { wch: 18 },  // 提交时间
+      { wch: 18 },  // 问题1
+      { wch: 25 },  // 问题2
+      { wch: 12 },  // 问题3
+      { wch: 50 },  // 问题4 - 具体情况说明（加宽）
+    ]
     XLSX.utils.book_append_sheet(workbook, totalWorksheet, '总表')
 
     // 添加按导师分组的sheet（无论是否有区队过滤）
@@ -173,6 +181,18 @@ export async function GET(request: NextRequest) {
       // sheet名称不能超过31个字符
       const sheetName = advisor.length > 28 ? advisor.substring(0, 28) : advisor
       const advisorWorksheet = XLSX.utils.json_to_sheet(advisorData)
+      // 设置列宽："4.具体情况说明"列（I列，索引8）设置为50字符宽度
+      advisorWorksheet['!cols'] = [
+        { wch: 12 },  // 学号
+        { wch: 10 },  // 姓名
+        { wch: 10 },  // 区队
+        { wch: 15 },  // 导师
+        { wch: 18 },  // 提交时间
+        { wch: 18 },  // 问题1
+        { wch: 25 },  // 问题2
+        { wch: 12 },  // 问题3
+        { wch: 50 },  // 问题4 - 具体情况说明（加宽）
+      ]
       XLSX.utils.book_append_sheet(workbook, advisorWorksheet, sheetName)
     })
 
