@@ -1,30 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase'
-import { getCurrentWeek } from '@/lib/utils'
-
-// 检查当前是否在截止时间之前（周一23:59之前）
-function isBeforeDeadline(): boolean {
-  const deadline = process.env.WEEKLY_DEADLINE || 'Monday 23:59'
-  const [day, time] = deadline.split(' ')
-  const [hour, minute] = time.split(':').map(Number)
-
-  const now = new Date()
-  const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-  const targetDay = daysOfWeek.indexOf(day)
-
-  const currentDay = now.getDay()
-  const daysUntilTarget = (targetDay - currentDay + 7) % 7
-
-  const deadlineDate = new Date(now)
-  deadlineDate.setDate(now.getDate() + daysUntilTarget)
-  deadlineDate.setHours(hour, minute, 0, 0)
-
-  if (now > deadlineDate && daysUntilTarget !== 0) {
-    deadlineDate.setDate(deadlineDate.getDate() + 7)
-  }
-
-  return now < deadlineDate
-}
 
 export async function GET(request: NextRequest) {
   try {
@@ -52,42 +27,24 @@ export async function GET(request: NextRequest) {
       throw studentsError
     }
 
-    // 获取已提交的学生ID
-    let reports: any[] = []
+    // 获取已提交的学生ID - 查询传入的周次 + 下一周
+    const { data: weekReports } = await supabase
+      .from('weekly_reports')
+      .select('student_id')
+      .eq('week_number', parseInt(week))
+      .eq('year', parseInt(year))
 
-    if (isBeforeDeadline()) {
-      const currentWeek = getCurrentWeek()
-      // 查询上周 + 本周的数据
-      const { data: lastWeekReports } = await supabase
-        .from('weekly_reports')
-        .select('student_id')
-        .eq('week_number', parseInt(week))
-        .eq('year', parseInt(year))
+    const nextWeek = parseInt(week) + 1
+    const { data: nextWeekReports } = await supabase
+      .from('weekly_reports')
+      .select('student_id')
+      .eq('week_number', nextWeek)
+      .eq('year', parseInt(year))
 
-      const { data: thisWeekReports } = await supabase
-        .from('weekly_reports')
-        .select('student_id')
-        .eq('week_number', currentWeek.weekNumber)
-        .eq('year', currentWeek.year)
-
-      // 合并去重
-      const studentSet = new Set()
-      ;[...(lastWeekReports || []), ...(thisWeekReports || [])].forEach((r: any) => {
-        studentSet.add(r.student_id)
-      })
-      reports = Array.from(studentSet).map(id => ({ student_id: id }))
-    } else {
-      // 正常查询本周数据
-      const { data: weekReports } = await supabase
-        .from('weekly_reports')
-        .select('student_id')
-        .eq('week_number', parseInt(week))
-        .eq('year', parseInt(year))
-
-      reports = weekReports || []
-    }
-
-    const submittedStudentIds = new Set(reports.map(r => r.student_id))
+    // 合并去重
+    const submittedStudentIds = new Set()
+    ;(weekReports || []).forEach((r: any) => submittedStudentIds.add(r.student_id))
+    ;(nextWeekReports || []).forEach((r: any) => submittedStudentIds.add(r.student_id))
 
     // 筛选出未提交的学生
     const unsubmittedStudents = students.filter(

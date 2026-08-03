@@ -58,44 +58,32 @@ export async function GET(request: NextRequest) {
     let reports: any[] = []
     let reportsError: any = null
 
-    // 如果当前在截止时间之前（周一23:59之前），需要同时查询本周数据
-    if (isBeforeDeadline()) {
-      const currentWeek = getCurrentWeek()
-      // 查询上周 + 本周的数据
-      const { data: lastWeekReports, error: lastWeekError } = await supabase
-        .from('weekly_reports')
-        .select('student_id, submitted_at')
-        .eq('week_number', parseInt(week))
-        .eq('year', parseInt(year))
+    // 查询传入的周次
+    const { data: weekReports, error: weekError } = await supabase
+      .from('weekly_reports')
+      .select('student_id, submitted_at')
+      .eq('week_number', parseInt(week))
+      .eq('year', parseInt(year))
 
-      const { data: thisWeekReports, error: thisWeekError } = await supabase
-        .from('weekly_reports')
-        .select('student_id, submitted_at')
-        .eq('week_number', currentWeek.weekNumber)
-        .eq('year', currentWeek.year)
+    // 同时查询下一周的数据（因为周一0:00后提交的会被计入下一周）
+    const nextWeek = parseInt(week) + 1
+    const { data: nextWeekReports } = await supabase
+      .from('weekly_reports')
+      .select('student_id, submitted_at')
+      .eq('week_number', nextWeek)
+      .eq('year', parseInt(year))
 
-      if (lastWeekError) reportsError = lastWeekError
-      else if (thisWeekError) reportsError = thisWeekError
-      else {
-        // 合并数据，去重（同一学生只算一次）
-        const studentMap = new Map()
-        ;[...(lastWeekReports || []), ...(thisWeekReports || [])].forEach((r: any) => {
-          if (!studentMap.has(r.student_id)) {
-            studentMap.set(r.student_id, r)
-          }
-        })
-        reports = Array.from(studentMap.values())
-      }
-    } else {
-      // 正常查询本周数据
-      const { data: weekReports, error: weekError } = await supabase
-        .from('weekly_reports')
-        .select('student_id, submitted_at')
-        .eq('week_number', parseInt(week))
-        .eq('year', parseInt(year))
-
-      reports = weekReports || []
+    if (weekError) {
       reportsError = weekError
+    } else {
+      // 合并数据，去重（同一学生只算一次）
+      const studentMap = new Map()
+      ;[...(weekReports || []), ...(nextWeekReports || [])].forEach((r: any) => {
+        if (!studentMap.has(r.student_id)) {
+          studentMap.set(r.student_id, r)
+        }
+      })
+      reports = Array.from(studentMap.values())
     }
 
     if (reportsError) {
