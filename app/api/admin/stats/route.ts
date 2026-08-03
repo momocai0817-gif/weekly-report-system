@@ -1,5 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase'
+import { getCurrentWeek } from '@/lib/utils'
+
+// 检查当前是否在截止时间之前（周一23:59之前）
+function isBeforeDeadline(): boolean {
+  const deadline = process.env.WEEKLY_DEADLINE || 'Monday 23:59'
+  const [day, time] = deadline.split(' ')
+  const [hour, minute] = time.split(':').map(Number)
+
+  const now = new Date()
+  const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+  const targetDay = daysOfWeek.indexOf(day)
+
+  const currentDay = now.getDay()
+  const daysUntilTarget = (targetDay - currentDay + 7) % 7
+
+  const deadlineDate = new Date(now)
+  deadlineDate.setDate(now.getDate() + daysUntilTarget)
+  deadlineDate.setHours(hour, minute, 0, 0)
+
+  // 如果截止时间已过，设置为下周的截止时间
+  if (now > deadlineDate && daysUntilTarget !== 0) {
+    deadlineDate.setDate(deadlineDate.getDate() + 7)
+  }
+
+  return now < deadlineDate
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -28,12 +54,49 @@ export async function GET(request: NextRequest) {
     const squad1Total = students.filter(s => s.squad === '一区队').length
     const squad2Total = students.filter(s => s.squad === '二区队').length
 
-    // 获取本周提交的学生
-    const { data: reports, error: reportsError } = await supabase
-      .from('weekly_reports')
-      .select('student_id')
-      .eq('week_number', parseInt(week))
-      .eq('year', parseInt(year))
+    // 获取提交的学生数据
+    let reports: any[] = []
+    let reportsError: any = null
+
+    // 如果当前在截止时间之前（周一23:59之前），需要同时查询本周数据
+    if (isBeforeDeadline()) {
+      const currentWeek = getCurrentWeek()
+      // 查询上周 + 本周的数据
+      const { data: lastWeekReports, error: lastWeekError } = await supabase
+        .from('weekly_reports')
+        .select('student_id, submitted_at')
+        .eq('week_number', parseInt(week))
+        .eq('year', parseInt(year))
+
+      const { data: thisWeekReports, error: thisWeekError } = await supabase
+        .from('weekly_reports')
+        .select('student_id, submitted_at')
+        .eq('week_number', currentWeek.weekNumber)
+        .eq('year', currentWeek.year)
+
+      if (lastWeekError) reportsError = lastWeekError
+      else if (thisWeekError) reportsError = thisWeekError
+      else {
+        // 合并数据，去重（同一学生只算一次）
+        const studentMap = new Map()
+        ;[...(lastWeekReports || []), ...(thisWeekReports || [])].forEach((r: any) => {
+          if (!studentMap.has(r.student_id)) {
+            studentMap.set(r.student_id, r)
+          }
+        })
+        reports = Array.from(studentMap.values())
+      }
+    } else {
+      // 正常查询本周数据
+      const { data: weekReports, error: weekError } = await supabase
+        .from('weekly_reports')
+        .select('student_id, submitted_at')
+        .eq('week_number', parseInt(week))
+        .eq('year', parseInt(year))
+
+      reports = weekReports || []
+      reportsError = weekError
+    }
 
     if (reportsError) {
       throw reportsError

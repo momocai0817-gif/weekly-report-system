@@ -1,6 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase'
+import { getCurrentWeek } from '@/lib/utils'
 import * as XLSX from 'xlsx'
+
+// 检查当前是否在截止时间之前（周一23:59之前）
+function isBeforeDeadline(): boolean {
+  const deadline = process.env.WEEKLY_DEADLINE || 'Monday 23:59'
+  const [day, time] = deadline.split(' ')
+  const [hour, minute] = time.split(':').map(Number)
+
+  const now = new Date()
+  const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+  const targetDay = daysOfWeek.indexOf(day)
+
+  const currentDay = now.getDay()
+  const daysUntilTarget = (targetDay - currentDay + 7) % 7
+
+  const deadlineDate = new Date(now)
+  deadlineDate.setDate(now.getDate() + daysUntilTarget)
+  deadlineDate.setHours(hour, minute, 0, 0)
+
+  if (now > deadlineDate && daysUntilTarget !== 0) {
+    deadlineDate.setDate(deadlineDate.getDate() + 7)
+  }
+
+  return now < deadlineDate
+}
 
 function formatDateTime(date: string): string {
   const d = new Date(date)
@@ -11,6 +36,39 @@ function formatDateTime(date: string): string {
     hour: '2-digit',
     minute: '2-digit',
   })
+}
+
+// 按导师分组生成数据
+function generateAdvisorSheets(
+  reports: any[],
+  studentMap: Map<string, any>
+): Map<string, any[]> {
+  const advisorGroups = new Map<string, any[]>()
+
+  reports.forEach((report) => {
+    const student = studentMap.get(report.student_id)
+    if (!student) return
+
+    const advisor = student.advisor || '未分配导师'
+    if (!advisorGroups.has(advisor)) {
+      advisorGroups.set(advisor, [])
+    }
+
+    advisorGroups.get(advisor)!.push({
+      '学号': student.student_id,
+      '姓名': student.name,
+      '区队': student.squad,
+      '导师': advisor,
+      '提交时间': formatDateTime(report.submitted_at),
+      '1.本周是否咨询过导师问题？': report.contacted_professor ? '是' : '否',
+      '2.未咨询原因/所处阶段': !report.contacted_professor ? (report.not_contacted_reason || '') : '',
+      '3.导师是否回复？': report.contacted_professor ? (report.professor_replied ? '是' : '否') : '',
+      '4.具体情况说明': report.contacted_professor && report.professor_replied ? (report.reply_details || '') : '',
+      '签名': report.signature ? '已签名' : '未签名',
+    })
+  })
+
+  return advisorGroups
 }
 
 export async function GET(request: NextRequest) {
@@ -29,14 +87,56 @@ export async function GET(request: NextRequest) {
 
     const supabase = createServiceClient()
 
-    // 获取本周所有周报
-    const { data: reports, error: reportsError } = await supabase
-      .from('weekly_reports')
-      .select('*')
-      .eq('week_number', parseInt(week))
-      .eq('year', parseInt(year))
+    // 获取周报数据
+    let reports: any[] = []
+    let reportsError: any = null
+
+    if (isBeforeDeadline()) {
+      const currentWeek = getCurrentWeek()
+      // 查询上周 + 本周的数据
+      const { data: lastWeekReports, error: lastWeekError } = await supabase
+        .from('weekly_reports')
+        .select('*')
+        .eq('week_number', parseInt(week))
+        .eq('year', parseInt(year))
+
+      const { data: thisWeekReports, error: thisWeekError } = await supabase
+        .from('weekly_reports')
+        .select('*')
+        .eq('week_number', currentWeek.weekNumber)
+        .eq('year', currentWeek.year)
+
+      if (lastWeekError) reportsError = lastWeekError
+      else if (thisWeekError) reportsError = thisWeekError
+      else {
+        // 合并数据，去重（同一学生只保留最新的提交）
+        const studentMap = new Map()
+        ;[...(lastWeekReports || []), ...(thisWeekReports || [])].forEach((r: any) => {
+          const existing = studentMap.get(r.student_id)
+          if (!existing || new Date(r.submitted_at) > new Date(existing.submitted_at)) {
+            studentMap.set(r.student_id, r)
+          }
+        })
+        reports = Array.from(studentMap.values())
+      }
+    } else {
+      // 正常查询本周数据
+      const { data: weekReports, error: weekError } = await supabase
+        .from('weekly_reports')
+        .select('*')
+        .eq('week_number', parseInt(week))
+        .eq('year', parseInt(year))
+
+      reports = weekReports || []
+      reportsError = weekError
+    }
 
     if (reportsError) {
+      console.error('查询周报错误:', reportsError)
+      throw reportsError
+    }
+
+    if (!reports || reports.length === 0) {
       console.error('查询周报错误:', reportsError)
       throw reportsError
     }
@@ -96,9 +196,33 @@ export async function GET(request: NextRequest) {
       })
 
     // 创建Excel工作簿
-    const worksheet = XLSX.utils.json_to_sheet(excelData)
     const workbook = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(workbook, worksheet, '已交名单')
+
+    // 添加总表（第一个sheet）
+    const totalWorksheet = XLSX.utils.json_to_sheet(excelData)
+    XLSX.utils.book_append_sheet(workbook, totalWorksheet, '总表')
+
+    // 如果是全部导出（无区队过滤），添加按导师分组的sheet
+    if (!squad) {
+      const advisorGroups = generateAdvisorSheets(reports, studentMap)
+
+      // 按导师名字排序
+      const sortedAdvisors = Array.from(advisorGroups.keys()).sort((a, b) =>
+        a.localeCompare(b, 'zh-CN')
+      )
+
+      sortedAdvisors.forEach((advisor) => {
+        const advisorData = advisorGroups.get(advisor)!
+        // sheet名称不能超过31个字符
+        const sheetName = advisor.length > 28 ? advisor.substring(0, 28) : advisor
+        const advisorWorksheet = XLSX.utils.json_to_sheet(advisorData)
+        XLSX.utils.book_append_sheet(workbook, advisorWorksheet, sheetName)
+      })
+    } else {
+      // 按区队导出时，只添加总表（保持简单）
+      const worksheet = XLSX.utils.json_to_sheet(excelData)
+      XLSX.utils.book_append_sheet(workbook, worksheet, '已交名单')
+    }
 
     // 生成Excel文件
     const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx', bookSST: false })

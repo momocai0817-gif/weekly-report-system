@@ -29,10 +29,11 @@ export function getCurrentWeek(): { weekNumber: number; year: number } {
   deadlineDate.setDate(now.getDate() - daysSinceTarget)
   deadlineDate.setHours(hour, minute, 59, 999)
 
-  // 如果当前时间已过本周截止时间，使用下一周日期来计算周次
+  // 如果当前时间已过本周截止时间，使用下一天；否则使用上一周的截止时间
+  // 这样在周一23:59之前显示上周，之后显示本周
   const displayDate = now.getTime() > deadlineDate.getTime()
     ? new Date(now.getTime() + 24 * 60 * 60 * 1000)
-    : now
+    : new Date(deadlineDate.getTime() - 24 * 60 * 60 * 1000)
 
   const startDate = new Date(process.env.SEMESTER_START_DATE || '2025-02-24')
   const year = displayDate.getFullYear()
