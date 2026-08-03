@@ -34,6 +34,7 @@ function generateAdvisorSheets(
       '姓名': student.name,
       '区队': student.squad,
       '导师': advisor,
+      '提交状态': '已提交',
       '提交时间': formatDateTime(report.submitted_at),
       '1.本周是否咨询过导师问题？': report.contacted_professor ? '是' : '否',
       '2.未咨询原因/所处阶段': !report.contacted_professor ? (report.not_contacted_reason || '') : '',
