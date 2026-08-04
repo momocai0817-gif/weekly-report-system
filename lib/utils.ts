@@ -33,25 +33,33 @@ export function getCurrentWeek(): { weekNumber: number; year: number } {
   // 截止时间之后：填写本周的周报（使用本周一计算周次）
   let weekStartMonday: Date
   if (now.getTime() > deadlineDate.getTime()) {
-    // 已过截止时间：使用本周一
+    // 已过截止时间：使用本周一00:00
     weekStartMonday = new Date(deadlineDate)
+    weekStartMonday.setHours(0, 0, 0, 0)
   } else {
-    // 未过截止时间：使用上周一
+    // 未过截止时间：使用上周一00:00
     weekStartMonday = new Date(deadlineDate)
     weekStartMonday.setDate(weekStartMonday.getDate() - 7)
+    weekStartMonday.setHours(0, 0, 0, 0)
   }
 
   const startDate = new Date(process.env.SEMESTER_START_DATE || '2025-02-24')
   const year = weekStartMonday.getFullYear()
   const startOfYear = new Date(year, 0, 1)
+  // 学期开始的周一（用于计算周次）
   const startDateThisYear = new Date(year, startDate.getMonth(), startDate.getDate())
+  const startWeekMonday = new Date(startDateThisYear)
+  // 调整到当周的周一
+  const startDayOfWeek = startDateThisYear.getDay()
+  const daysToMonday = startDayOfWeek === 0 ? 6 : startDayOfWeek - 1
+  startWeekMonday.setDate(startWeekMonday.getDate() - daysToMonday)
 
   // 如果当前日期在本学期开始之前，使用去年的学期开始日期
-  const actualStartDate = weekStartMonday < startDateThisYear
-    ? new Date(year - 1, startDate.getMonth(), startDate.getDate())
-    : startDateThisYear
+  const actualStartWeekMonday = weekStartMonday < startWeekMonday
+    ? new Date(year - 1, startWeekMonday.getMonth(), startWeekMonday.getDate())
+    : startWeekMonday
 
-  const diffTime = weekStartMonday.getTime() - actualStartDate.getTime()
+  const diffTime = weekStartMonday.getTime() - actualStartWeekMonday.getTime()
   const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24))
   const weekNumber = Math.floor(diffDays / 7) + 1
 
