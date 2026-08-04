@@ -27,8 +27,24 @@ body {
 
 /* 确保所有输入框文字都是黑色 */
 input {
-  color: #000 !important;
-  -webkit-text-fill-color: #000 !important;
+  color: #000000 !important;
+  -webkit-text-fill-color: #000000 !important;
+  opacity: 1 !important;
+}
+
+input:focus {
+  color: #000000 !important;
+  -webkit-text-fill-color: #000000 !important;
+}
+
+input[type="number"] {
+  color: #000000 !important;
+  -webkit-text-fill-color: #000000 !important;
+}
+
+input::placeholder {
+  color: #9ca3af !important;
+  -webkit-text-fill-color: #9ca3af !important;
 }
 
 input[type="number"]::-webkit-inner-spin-button,
