@@ -137,6 +137,7 @@ export default function AdminUnrepliedPage() {
                 value={selectedYear}
                 onChange={(e) => setSelectedYear(parseInt(e.target.value))}
                 className="w-20 px-2 py-1 border border-gray-300 rounded text-center"
+                style={{ color: '#000', WebkitTextFillColor: '#000' }}
                 min={2020}
                 max={2030}
               />
@@ -150,6 +151,7 @@ export default function AdminUnrepliedPage() {
                 value={selectedWeek}
                 onChange={(e) => setSelectedWeek(parseInt(e.target.value))}
                 className="w-16 px-2 py-1 border border-gray-300 rounded text-center"
+                style={{ color: '#000', WebkitTextFillColor: '#000' }}
                 min={1}
                 max={52}
               />

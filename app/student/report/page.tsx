@@ -1,12 +1,13 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { getCurrentWeek, formatDateTime } from '@/lib/utils'
 import SignatureCanvas from '@/components/SignatureCanvas'
 
 export default function StudentReportPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -14,6 +15,13 @@ export default function StudentReportPage() {
   const [error, setError] = useState('')
 
   const currentWeek = getCurrentWeek()
+
+  // 支持通过URL参数指定周次（如 ?week=23&year=2026）
+  const targetWeek = searchParams.get('week')
+  const targetYear = searchParams.get('year')
+  const displayWeek = targetWeek && targetYear
+    ? { weekNumber: parseInt(targetWeek), year: parseInt(targetYear) }
+    : currentWeek
 
   // 表单状态
   const [formData, setFormData] = useState({

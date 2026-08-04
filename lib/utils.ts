@@ -17,8 +17,7 @@ export function getCurrentWeek(): { weekNumber: number; year: number } {
 
   const currentDay = now.getDay()
 
-  // 计算本周截止日期（最近的周日，可能是今天或之前）
-  // 如果今天是周日，截止日期就是今天；否则截止日期是上一个周日
+  // 计算本周截止日期（最近的周一，可能是今天或之前）
   let daysSinceTarget = currentDay - targetDay
   if (daysSinceTarget < 0) {
     daysSinceTarget += 7
@@ -29,23 +28,30 @@ export function getCurrentWeek(): { weekNumber: number; year: number } {
   deadlineDate.setDate(now.getDate() - daysSinceTarget)
   deadlineDate.setHours(hour, minute, 59, 999)
 
-  // 如果当前时间已过本周截止时间，使用下一天；否则使用上一周的截止时间
-  // 这样在周一23:59之前显示上周，之后显示本周
-  const displayDate = now.getTime() > deadlineDate.getTime()
-    ? new Date(now.getTime() + 24 * 60 * 60 * 1000)
-    : new Date(deadlineDate.getTime() - 24 * 60 * 60 * 1000)
+  // 根据是否已过截止时间来确定周报所属的周
+  // 截止时间（周一23:59）之前：填写上一周的周报（使用上周一计算周次）
+  // 截止时间之后：填写本周的周报（使用本周一计算周次）
+  let weekStartMonday: Date
+  if (now.getTime() > deadlineDate.getTime()) {
+    // 已过截止时间：使用本周一
+    weekStartMonday = new Date(deadlineDate)
+  } else {
+    // 未过截止时间：使用上周一
+    weekStartMonday = new Date(deadlineDate)
+    weekStartMonday.setDate(weekStartMonday.getDate() - 7)
+  }
 
   const startDate = new Date(process.env.SEMESTER_START_DATE || '2025-02-24')
-  const year = displayDate.getFullYear()
+  const year = weekStartMonday.getFullYear()
   const startOfYear = new Date(year, 0, 1)
   const startDateThisYear = new Date(year, startDate.getMonth(), startDate.getDate())
 
   // 如果当前日期在本学期开始之前，使用去年的学期开始日期
-  const actualStartDate = displayDate < startDateThisYear
+  const actualStartDate = weekStartMonday < startDateThisYear
     ? new Date(year - 1, startDate.getMonth(), startDate.getDate())
     : startDateThisYear
 
-  const diffTime = displayDate.getTime() - actualStartDate.getTime()
+  const diffTime = weekStartMonday.getTime() - actualStartDate.getTime()
   const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24))
   const weekNumber = Math.floor(diffDays / 7) + 1
 
