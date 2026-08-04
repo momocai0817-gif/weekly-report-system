@@ -20,6 +20,7 @@ interface Report {
   not_contacted_reason: string | null
   signature: string | null
   submitted_at: string
+  is_late?: boolean
 }
 
 export default function AdminReportsPage() {
@@ -209,6 +210,11 @@ function ReportCard({ report }: { report: Report }) {
             </span>
           </div>
           <div className="mt-2 flex items-center gap-4 text-sm">
+            {report.is_late && (
+              <span className="px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 text-xs font-medium">
+                晚交
+              </span>
+            )}
             <span
               className={`px-2 py-0.5 rounded-full ${
                 report.contacted_professor
