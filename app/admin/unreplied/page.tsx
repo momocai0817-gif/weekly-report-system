@@ -146,15 +146,31 @@ export default function AdminUnrepliedPage() {
               <label className="text-sm text-gray-600">
                 周次:
               </label>
-              <input
-                type="number"
-                value={selectedWeek}
-                onChange={(e) => setSelectedWeek(parseInt(e.target.value))}
-                className="w-16 px-2 py-1 border border-gray-300 rounded text-center"
-                style={{ color: '#000', WebkitTextFillColor: '#000' }}
-                min={1}
-                max={52}
-              />
+              <div className="flex items-center">
+                <input
+                  type="number"
+                  value={selectedWeek}
+                  onChange={(e) => setSelectedWeek(parseInt(e.target.value) || 1)}
+                  className="w-16 px-2 py-1 border border-gray-300 rounded-l text-center"
+                  style={{ color: '#000', WebkitTextFillColor: '#000' }}
+                  min={1}
+                  max={52}
+                />
+                <div className="flex flex-col border border-l-0 border-gray-300 rounded-r overflow-hidden">
+                  <button
+                    onClick={() => setSelectedWeek(Math.min(52, selectedWeek + 1))}
+                    className="px-2 py-0.5 text-gray-600 hover:bg-gray-100 text-xs leading-none border-b border-gray-300"
+                  >
+                    ▲
+                  </button>
+                  <button
+                    onClick={() => setSelectedWeek(Math.max(1, selectedWeek - 1))}
+                    className="px-2 py-0.5 text-gray-600 hover:bg-gray-100 text-xs leading-none"
+                  >
+                    ▼
+                  </button>
+                </div>
+              </div>
             </div>
             <button
               onClick={() => {
