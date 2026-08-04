@@ -65,34 +65,38 @@ export async function GET(request: NextRequest) {
       .eq('week_number', parseInt(week))
       .eq('year', parseInt(year))
 
-    // 同时查询下一周的数据（因为周一0:00后提交的会被计入下一周）
-    // 计算下一周周次
-    let nextWeek = parseInt(week) + 1
-    let nextYear = parseInt(year)
+    // 如果当前在截止时间之前（周一23:59之前），需要同时查询下一周数据
+    // 因为周一0:00后提交的会被计入下一周（数据库逻辑）
+    if (isBeforeDeadline()) {
+      let nextWeek = parseInt(week) + 1
+      let nextYear = parseInt(year)
 
-    // 如果超过52周，进入下一年
-    if (nextWeek > 52) {
-      nextWeek = 1
-      nextYear = parseInt(year) + 1
-    }
+      if (nextWeek > 52) {
+        nextWeek = 1
+        nextYear = parseInt(year) + 1
+      }
 
-    const { data: nextWeekReports } = await supabase
-      .from('weekly_reports')
-      .select('student_id, submitted_at')
-      .eq('week_number', nextWeek)
-      .eq('year', nextYear)
+      const { data: nextWeekReports } = await supabase
+        .from('weekly_reports')
+        .select('student_id, submitted_at')
+        .eq('week_number', nextWeek)
+        .eq('year', nextYear)
 
-    if (weekError) {
-      reportsError = weekError
-    } else {
-      // 合并数据，去重（同一学生只算一次）
-      const studentMap = new Map()
-      ;[...(weekReports || []), ...(nextWeekReports || [])].forEach((r: any) => {
-        if (!studentMap.has(r.student_id)) {
-          studentMap.set(r.student_id, r)
-        }
-      })
-      reports = Array.from(studentMap.values())
+      if (weekError) {
+        reportsError = weekError
+      } else if (isBeforeDeadline()) {
+        // 在截止时间之前，合并上周+本周数据，去重（同一学生只算一次）
+        const studentMap = new Map()
+        ;[...(weekReports || []), ...(nextWeekReports || [])].forEach((r: any) => {
+          if (!studentMap.has(r.student_id)) {
+            studentMap.set(r.student_id, r)
+          }
+        })
+        reports = Array.from(studentMap.values())
+      } else {
+        // 已过截止时间，只使用本周数据
+        reports = weekReports || []
+      }
     }
 
     if (reportsError) {

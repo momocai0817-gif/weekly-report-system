@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { getCurrentWeek, formatDateTime } from '@/lib/utils'
 import SignatureCanvas from '@/components/SignatureCanvas'
 
-export default function StudentReportPage() {
+function StudentReportContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [user, setUser] = useState<any>(null)
@@ -408,5 +408,18 @@ export default function StudentReportPage() {
         </div>
       </main>
     </div>
+  )
+}
+
+// 默认导出，用Suspense包裹内容
+export default function StudentReportPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-gray-600">加载中...</div>
+      </div>
+    }>
+      <StudentReportContent />
+    </Suspense>
   )
 }
