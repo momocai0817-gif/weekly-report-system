@@ -17,9 +17,8 @@ function getWeekDeadline(week: number, year: number): Date {
   const weekStartMonday = new Date(startWeekMonday)
   weekStartMonday.setDate(weekStartMonday.getDate() + (week - 1) * 7)
 
-  // 截止时间是周一23:59
+  // 截止时间是该周的周一23:59
   const deadline = new Date(weekStartMonday)
-  deadline.setDate(deadline.getDate() + 1) // 周一
   deadline.setHours(23, 59, 59, 999)
 
   return deadline
