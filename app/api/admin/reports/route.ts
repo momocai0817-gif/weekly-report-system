@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
     console.log(`=== 第${week}周 (${year}年) ===`)
     console.log('截止时间:', deadline.toISOString(), deadline.toLocaleString('zh-CN'))
 
-    // 标记晚交的记录：超过该周截止时间（周一23:59）提交的即为晚交
+    // 标记晚交的记录：超过该周截止时间（周日23:59）提交的即为晚交
     const reportsWithLateStatus = (reports || []).map((report: any) => {
       const submittedAt = new Date(report.submitted_at)
       const isLate = submittedAt.getTime() > deadline.getTime()
