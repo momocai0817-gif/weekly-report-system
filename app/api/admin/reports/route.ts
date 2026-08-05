@@ -25,11 +25,13 @@ function getWeekRange(week: number, year: number): { start: Date; end: Date } {
   return { start: weekStartMonday, end: weekEndSunday }
 }
 
-// 计算某周的截止时间（该周周日23:59:59.999）
+// 计算某周的截止时间（该周周一23:59:59.999）
 function getWeekDeadline(week: number, year: number): Date {
   const range = getWeekRange(week, year)
-  // range.end 已经是该周周日23:59:59，直接使用
-  return range.end
+  // 使用该周周一23:59:59作为截止时间
+  const deadline = new Date(range.start)
+  deadline.setHours(23, 59, 59, 999)
+  return deadline
 }
 
 export async function GET(request: NextRequest) {
@@ -73,7 +75,7 @@ export async function GET(request: NextRequest) {
     console.log(`=== 第${week}周 (${year}年) ===`)
     console.log('截止时间:', deadline.toISOString(), deadline.toLocaleString('zh-CN'))
 
-    // 标记晚交的记录：超过该周截止时间（周日23:59）提交的即为晚交
+    // 标记晚交的记录：超过该周截止时间（周一23:59）提交的即为晚交
     const reportsWithLateStatus = (reports || []).map((report: any) => {
       const submittedAt = new Date(report.submitted_at)
       const isLate = submittedAt.getTime() > deadline.getTime()
