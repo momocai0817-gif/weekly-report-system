@@ -29,8 +29,13 @@ export default function AdminDashboardPage() {
   const [stats, setStats] = useState<Stats | null>(null)
   const [unsubmittedStudents, setUnsubmittedStudents] = useState<Student[]>([])
   const [copied, setCopied] = useState(false)
+  const [showLateExportModal, setShowLateExportModal] = useState(false)
 
   const currentWeek = getCurrentWeek()
+  // 上一周（用于导出晚交名单）
+  const lastWeek = currentWeek.weekNumber > 1
+    ? { weekNumber: currentWeek.weekNumber - 1, year: currentWeek.year }
+    : { weekNumber: 52, year: currentWeek.year - 1 }
 
   useEffect(() => {
     const userStr = localStorage.getItem('user')
@@ -173,6 +178,133 @@ export default function AdminDashboardPage() {
     router.push('/login')
   }
 
+  // 导出晚交名单Excel
+  const handleExportLateExcel = async (squad?: string) => {
+    try {
+      const url = `/api/admin/late-reports?week=${lastWeek.weekNumber}&year=${lastWeek.year}`
+
+      const response = await fetch(url)
+      if (!response.ok) {
+        throw new Error('获取晚交数据失败')
+      }
+
+      const data = await response.json()
+      const lateReports = squad
+        ? data.lateReports.filter((r: any) => r.student.squad === squad)
+        : data.lateReports
+
+      if (lateReports.length === 0) {
+        alert(squad ? `${squad}没有晚交记录` : '没有晚交记录')
+        return
+      }
+
+      const XLSX = require('xlsx')
+      const headers = ['姓名', '学号', '区队', '导师', '周次', '是否咨询导师', '导师是否回复', '提交时间']
+
+      const rows = lateReports.map((report: any) => [
+        report.student.name,
+        report.student.student_id,
+        report.student.squad,
+        report.student.advisor,
+        `${report.year}年第${report.week_number}周`,
+        report.contacted_professor ? '是' : '否',
+        report.contacted_professor ? (report.professor_replied ? '是' : '否') : '-',
+        new Date(report.submitted_at).toLocaleString('zh-CN')
+      ])
+
+      const worksheet = XLSX.utils.aoa_to_sheet([headers, ...rows])
+      worksheet['!cols'] = [
+        { wch: 12 }, { wch: 15 }, { wch: 10 }, { wch: 12 },
+        { wch: 15 }, { wch: 12 }, { wch: 12 }, { wch: 20 },
+      ]
+
+      const workbook = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(workbook, worksheet, '晚交名单')
+      XLSX.writeFile(workbook, squad
+        ? `${squad}_晚交名单_第${lastWeek.weekNumber}周.xlsx`
+        : `晚交名单_第${lastWeek.weekNumber}周.xlsx`
+      )
+    } catch (err) {
+      console.error('导出失败:', err)
+      alert('导出失败，请稍后重试')
+    }
+  }
+
+  // 导出晚交人员签名
+  const handleExportLateSignatures = async (squad?: string) => {
+    try {
+      const url = `/api/admin/late-reports?week=${lastWeek.weekNumber}&year=${lastWeek.year}`
+
+      const response = await fetch(url)
+      if (!response.ok) {
+        throw new Error('获取晚交数据失败')
+      }
+
+      const data = await response.json()
+      const lateReports = squad
+        ? data.lateReports.filter((r: any) => r.student.squad === squad)
+        : data.lateReports
+
+      const withSignatures = lateReports.filter((r: any) => r.signature)
+
+      if (withSignatures.length === 0) {
+        alert(squad ? `${squad}晚交人员没有签名` : '晚交人员没有签名')
+        return
+      }
+
+      const JSZip = require('jszip')
+      const zip = new JSZip()
+
+      if (squad) {
+        // 单个区队
+        const folder = zip.folder(squad)
+        withSignatures.forEach((report: any) => {
+          const filename = `${report.student.name}_${report.student.student_id}.png`
+          // 将base64转换为blob
+          const base64Data = report.signature.split(',')[1]
+          folder.file(filename, base64Data, { base64: true })
+        })
+      } else {
+        // 全部，按区分队
+        const squad1 = withSignatures.filter((r: any) => r.student.squad === '一区队')
+        const squad2 = withSignatures.filter((r: any) => r.student.squad === '二区队')
+
+        if (squad1.length > 0) {
+          const folder1 = zip.folder('一区队')
+          squad1.forEach((report: any) => {
+            const filename = `${report.student.name}_${report.student.student_id}.png`
+            const base64Data = report.signature.split(',')[1]
+            folder1!.file(filename, base64Data, { base64: true })
+          })
+        }
+
+        if (squad2.length > 0) {
+          const folder2 = zip.folder('二区队')
+          squad2.forEach((report: any) => {
+            const filename = `${report.student.name}_${report.student.student_id}.png`
+            const base64Data = report.signature.split(',')[1]
+            folder2!.file(filename, base64Data, { base64: true })
+          })
+        }
+      }
+
+      const content = await zip.generateAsync({ type: 'blob' })
+      const blobUrl = window.URL.createObjectURL(content)
+      const a = document.createElement('a')
+      a.href = blobUrl
+      a.download = squad
+        ? `${squad}_晚交签名_第${lastWeek.weekNumber}周.zip`
+        : `晚交签名_第${lastWeek.weekNumber}周.zip`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      window.URL.revokeObjectURL(blobUrl)
+    } catch (err) {
+      console.error('导出失败:', err)
+      alert('导出失败，请稍后重试')
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -213,11 +345,11 @@ export default function AdminDashboardPage() {
             第 {currentWeek.weekNumber} 周 ({currentWeek.year}年)
           </h2>
           <button
-            onClick={() => router.push('/admin/late-reports')}
+            onClick={() => setShowLateExportModal(true)}
             className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition font-medium flex items-center gap-2 shadow-sm"
           >
             <span className="text-lg">⚠️</span>
-            查看晚交名单
+            导出第{lastWeek.weekNumber}周晚交名单
           </button>
         </div>
 
@@ -523,6 +655,89 @@ export default function AdminDashboardPage() {
           </button>
         </div>
       </main>
+
+      {/* 晚交导出弹窗 */}
+      {showLateExportModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b flex justify-between items-center">
+              <h3 className="text-lg font-semibold text-gray-800">
+                导出第{lastWeek.weekNumber}周晚交名单
+              </h3>
+              <button
+                onClick={() => setShowLateExportModal(false)}
+                className="text-gray-400 hover:text-gray-600 text-2xl leading-none"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {/* Excel导出 */}
+              <div>
+                <h4 className="font-medium text-gray-700 mb-3">📊 导出Excel名单</h4>
+                <div className="grid grid-cols-3 gap-3">
+                  <button
+                    onClick={() => handleExportLateExcel('一区队')}
+                    className="px-4 py-3 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition flex flex-col items-center gap-1"
+                  >
+                    <span className="text-lg">📊</span>
+                    <span className="text-sm font-medium">一区队</span>
+                  </button>
+                  <button
+                    onClick={() => handleExportLateExcel('二区队')}
+                    className="px-4 py-3 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition flex flex-col items-center gap-1"
+                  >
+                    <span className="text-lg">📊</span>
+                    <span className="text-sm font-medium">二区队</span>
+                  </button>
+                  <button
+                    onClick={() => handleExportLateExcel()}
+                    className="px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition flex flex-col items-center gap-1"
+                  >
+                    <span className="text-lg">📊</span>
+                    <span className="text-sm font-medium">全部</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* 签名导出 */}
+              <div>
+                <h4 className="font-medium text-gray-700 mb-3">📁 导出签名压缩包</h4>
+                <div className="grid grid-cols-3 gap-3">
+                  <button
+                    onClick={() => handleExportLateSignatures('一区队')}
+                    className="px-4 py-3 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition flex flex-col items-center gap-1"
+                  >
+                    <span className="text-lg">📁</span>
+                    <span className="text-sm font-medium">一区队</span>
+                  </button>
+                  <button
+                    onClick={() => handleExportLateSignatures('二区队')}
+                    className="px-4 py-3 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition flex flex-col items-center gap-1"
+                  >
+                    <span className="text-lg">📁</span>
+                    <span className="text-sm font-medium">二区队</span>
+                  </button>
+                  <button
+                    onClick={() => handleExportLateSignatures()}
+                    className="px-4 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition flex flex-col items-center gap-1"
+                  >
+                    <span className="text-lg">📁</span>
+                    <span className="text-sm font-medium">全部</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 bg-gray-50 border-t rounded-b-xl">
+              <p className="text-sm text-gray-500 text-center">
+                晚交判定：超过第{lastWeek.weekNumber}周周一23:59提交
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
