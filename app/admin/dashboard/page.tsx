@@ -32,6 +32,7 @@ export default function AdminDashboardPage() {
   const [showLateExportModal, setShowLateExportModal] = useState(false)
   const [lateReports, setLateReports] = useState<any[]>([])
   const [loadingLate, setLoadingLate] = useState(false)
+  const [unsubmittedLastWeek, setUnsubmittedLastWeek] = useState<Student[]>([])
 
   const currentWeek = getCurrentWeek()
   // 上一周（用于导出晚交名单）
@@ -66,13 +67,21 @@ export default function AdminDashboardPage() {
   const fetchLateReports = async () => {
     setLoadingLate(true)
     try {
-      const response = await fetch(
+      // 获取晚交数据
+      const lateResponse = await fetch(
         `/api/admin/late-reports?week=${lastWeek.weekNumber}&year=${lastWeek.year}`
       )
-      const data = await response.json()
-      setLateReports(data.lateReports || [])
+      const lateData = await lateResponse.json()
+      setLateReports(lateData.lateReports || [])
+
+      // 获取上周未交数据
+      const unsubmittedResponse = await fetch(
+        `/api/admin/unsubmitted?week=${lastWeek.weekNumber}&year=${lastWeek.year}`
+      )
+      const unsubmittedData = await unsubmittedResponse.json()
+      setUnsubmittedLastWeek(unsubmittedData.students || [])
     } catch (err) {
-      console.error('获取晚交名单失败:', err)
+      console.error('获取数据失败:', err)
     } finally {
       setLoadingLate(false)
     }
@@ -862,6 +871,59 @@ export default function AdminDashboardPage() {
                       </div>
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* 未交人员列表 */}
+              {!loadingLate && unsubmittedLastWeek.length > 0 && (
+                <div className="mt-6 pt-6 border-t">
+                  <h4 className="font-semibold text-red-700 mb-3">
+                    未交名单 ({unsubmittedLastWeek.length}人)
+                  </h4>
+                  <div className="space-y-3">
+                    {/* 一区队未交 */}
+                    {unsubmittedLastWeek.filter(s => s.squad === '一区队').length > 0 && (
+                      <div>
+                        <h5 className="text-sm font-medium text-gray-700 mb-2">
+                          一区队 ({unsubmittedLastWeek.filter(s => s.squad === '一区队').length}人)
+                        </h5>
+                        <div className="bg-red-50 rounded-lg divide-y">
+                          {unsubmittedLastWeek
+                            .filter(s => s.squad === '一区队')
+                            .map((student) => (
+                              <div key={student.id} className="p-2 flex items-center justify-between">
+                                <div>
+                                  <span className="font-medium text-gray-900">{student.name}</span>
+                                  <span className="text-gray-700 text-sm ml-2">({student.student_id})</span>
+                                </div>
+                                <span className="text-sm text-gray-600">导师：{student.advisor}</span>
+                              </div>
+                            ))}
+                        </div>
+                      </div>
+                    )}
+                    {/* 二区队未交 */}
+                    {unsubmittedLastWeek.filter(s => s.squad === '二区队').length > 0 && (
+                      <div>
+                        <h5 className="text-sm font-medium text-gray-700 mb-2">
+                          二区队 ({unsubmittedLastWeek.filter(s => s.squad === '二区队').length}人)
+                        </h5>
+                        <div className="bg-red-50 rounded-lg divide-y">
+                          {unsubmittedLastWeek
+                            .filter(s => s.squad === '二区队')
+                            .map((student) => (
+                              <div key={student.id} className="p-2 flex items-center justify-between">
+                                <div>
+                                  <span className="font-medium text-gray-900">{student.name}</span>
+                                  <span className="text-gray-700 text-sm ml-2">({student.student_id})</span>
+                                </div>
+                                <span className="text-sm text-gray-600">导师：{student.advisor}</span>
+                              </div>
+                            ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
