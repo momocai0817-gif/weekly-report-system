@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase'
 
-// 计算某周的截止时间（周一23:59）
-function getWeekDeadline(week: number, year: number): Date {
+// 计算某周的时间范围（周一到周日）
+function getWeekRange(week: number, year: number): { start: Date; end: Date } {
   const startDate = new Date(process.env.SEMESTER_START_DATE || '2025-02-24')
   const startOfYear = new Date(year, 0, 1)
   const startDateThisYear = new Date(year, startDate.getMonth(), startDate.getDate())
@@ -17,10 +17,19 @@ function getWeekDeadline(week: number, year: number): Date {
   const weekStartMonday = new Date(startWeekMonday)
   weekStartMonday.setDate(weekStartMonday.getDate() + (week - 1) * 7)
 
-  // 截止时间是该周的周一23:59
-  const deadline = new Date(weekStartMonday)
-  deadline.setHours(23, 59, 59, 999)
+  // 该周结束日期（周日晚上）
+  const weekEndSunday = new Date(weekStartMonday)
+  weekEndSunday.setDate(weekEndSunday.getDate() + 6)
+  weekEndSunday.setHours(23, 59, 59, 999)
 
+  return { start: weekStartMonday, end: weekEndSunday }
+}
+
+// 计算某周的截止时间（周一23:59）
+function getWeekDeadline(week: number, year: number): Date {
+  const range = getWeekRange(week, year)
+  const deadline = new Date(range.start)
+  deadline.setHours(23, 59, 59, 999)
   return deadline
 }
 
@@ -58,12 +67,14 @@ export async function GET(request: NextRequest) {
       throw error
     }
 
-    // 计算该周的截止时间
+    // 计算该周的时间范围
+    const weekRange = getWeekRange(parseInt(week), parseInt(year))
     const deadline = getWeekDeadline(parseInt(week), parseInt(year))
 
-    // 标记晚交的记录
+    // 标记晚交的记录：超过该周截止时间（周一23:59）提交的即为晚交
     const reportsWithLateStatus = (reports || []).map((report: any) => {
       const submittedAt = new Date(report.submitted_at)
+      // 检查是否超过截止时间（该周周一23:59）
       const isLate = submittedAt.getTime() > deadline.getTime()
       return {
         ...report,

@@ -69,6 +69,49 @@ export default function AdminReportsPage() {
     router.push('/admin/dashboard')
   }
 
+  // 导出功能
+  const exportReports = (data: Report[], filename: string) => {
+    if (data.length === 0) return
+
+    // Excel数据
+    const headers = ['姓名', '学号', '区队', '导师', '周次', '是否晚交', '是否咨询导师', '导师是否回复', '提交时间']
+
+    const rows = data.map(report => [
+      report.student.name,
+      report.student.student_id,
+      report.student.squad,
+      report.student.advisor,
+      `${report.year}年第${report.week_number}周`,
+      report.is_late ? '是' : '否',
+      report.contacted_professor ? '是' : '否',
+      report.contacted_professor ? (report.professor_replied ? '是' : '否') : '-',
+      formatDateTime(report.submitted_at)
+    ])
+
+    // 使用xlsx库创建工作簿
+    const XLSX = require('xlsx')
+    const worksheet = XLSX.utils.aoa_to_sheet([headers, ...rows])
+
+    // 设置列宽
+    worksheet['!cols'] = [
+      { wch: 12 }, // 姓名
+      { wch: 15 }, // 学号
+      { wch: 10 }, // 区队
+      { wch: 12 }, // 导师
+      { wch: 15 }, // 周次
+      { wch: 10 }, // 是否晚交
+      { wch: 12 }, // 是否咨询导师
+      { wch: 12 }, // 导师是否回复
+      { wch: 20 }, // 提交时间
+    ]
+
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, worksheet, '周报记录')
+
+    // 导出文件
+    XLSX.writeFile(workbook, `${filename}.xlsx`)
+  }
+
   // 按区队分组
   const squad1Reports = reports.filter(r => r.student.squad === '一区队')
   const squad2Reports = reports.filter(r => r.student.squad === '二区队')
@@ -153,6 +196,29 @@ export default function AdminReportsPage() {
             <span className="text-gray-500 ml-4">
               共 {reports.length} 份报告
             </span>
+            <div className="ml-auto flex gap-2">
+              <button
+                onClick={() => exportReports(reports.filter(r => !r.is_late), `${selectedYear}年第${selectedWeek}周-正常提交`)}
+                disabled={reports.filter(r => !r.is_late).length === 0}
+                className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+              >
+                导出正常提交
+              </button>
+              <button
+                onClick={() => exportReports(reports.filter(r => r.is_late), `${selectedYear}年第${selectedWeek}周-晚交`)}
+                disabled={reports.filter(r => r.is_late).length === 0}
+                className="px-3 py-1 text-sm bg-orange-600 text-white rounded hover:bg-orange-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+              >
+                导出晚交记录
+              </button>
+              <button
+                onClick={() => exportReports(reports, `${selectedYear}年第${selectedWeek}周-全部`)}
+                disabled={reports.length === 0}
+                className="px-3 py-1 text-sm bg-gray-600 text-white rounded hover:bg-gray-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+              >
+                导出全部
+              </button>
+            </div>
           </div>
         </div>
 
