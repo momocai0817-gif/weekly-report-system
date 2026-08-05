@@ -30,6 +30,8 @@ export default function AdminDashboardPage() {
   const [unsubmittedStudents, setUnsubmittedStudents] = useState<Student[]>([])
   const [copied, setCopied] = useState(false)
   const [showLateExportModal, setShowLateExportModal] = useState(false)
+  const [lateReports, setLateReports] = useState<any[]>([])
+  const [loadingLate, setLoadingLate] = useState(false)
 
   const currentWeek = getCurrentWeek()
   // 上一周（用于导出晚交名单）
@@ -53,6 +55,28 @@ export default function AdminDashboardPage() {
     setUser(userData)
     fetchDashboardData()
   }, [router])
+
+  // 当打开晚交弹窗时获取数据
+  useEffect(() => {
+    if (showLateExportModal) {
+      fetchLateReports()
+    }
+  }, [showLateExportModal])
+
+  const fetchLateReports = async () => {
+    setLoadingLate(true)
+    try {
+      const response = await fetch(
+        `/api/admin/late-reports?week=${lastWeek.weekNumber}&year=${lastWeek.year}`
+      )
+      const data = await response.json()
+      setLateReports(data.lateReports || [])
+    } catch (err) {
+      console.error('获取晚交名单失败:', err)
+    } finally {
+      setLoadingLate(false)
+    }
+  }
 
   const fetchDashboardData = async () => {
     setLoading(true)
@@ -659,11 +683,16 @@ export default function AdminDashboardPage() {
       {/* 晚交导出弹窗 */}
       {showLateExportModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden flex flex-col">
             <div className="p-6 border-b flex justify-between items-center">
-              <h3 className="text-lg font-semibold text-gray-800">
-                导出第{lastWeek.weekNumber}周晚交名单
-              </h3>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-800">
+                  第{lastWeek.weekNumber}周晚交名单
+                </h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  共 {lateReports.length} 人晚交
+                </p>
+              </div>
               <button
                 onClick={() => setShowLateExportModal(false)}
                 className="text-gray-400 hover:text-gray-600 text-2xl leading-none"
@@ -672,28 +701,93 @@ export default function AdminDashboardPage() {
               </button>
             </div>
 
-            <div className="p-6 space-y-4">
+            {/* 晚交人员列表 */}
+            <div className="flex-1 overflow-y-auto p-6">
+              {loadingLate ? (
+                <div className="text-center py-8 text-gray-500">加载中...</div>
+              ) : lateReports.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">🎉 该周没有晚交记录！</div>
+              ) : (
+                <div className="space-y-4">
+                  {/* 一区队 */}
+                  {lateReports.filter(r => r.student.squad === '一区队').length > 0 && (
+                    <div>
+                      <h4 className="font-medium text-orange-800 mb-2">
+                        一区队 ({lateReports.filter(r => r.student.squad === '一区队').length}人)
+                      </h4>
+                      <div className="bg-orange-50 rounded-lg divide-y">
+                        {lateReports
+                          .filter(r => r.student.squad === '一区队')
+                          .map((report) => (
+                            <div key={report.id} className="p-3 flex items-center justify-between">
+                              <div>
+                                <span className="font-medium text-gray-900">{report.student.name}</span>
+                                <span className="text-gray-700 text-sm ml-2">({report.student.student_id})</span>
+                                <span className="text-gray-600 text-sm ml-3">导师：{report.student.advisor}</span>
+                              </div>
+                              <span className="text-xs text-gray-500">
+                                {new Date(report.submitted_at).toLocaleString('zh-CN')}
+                              </span>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 二区队 */}
+                  {lateReports.filter(r => r.student.squad === '二区队').length > 0 && (
+                    <div>
+                      <h4 className="font-medium text-orange-800 mb-2">
+                        二区队 ({lateReports.filter(r => r.student.squad === '二区队').length}人)
+                      </h4>
+                      <div className="bg-orange-50 rounded-lg divide-y">
+                        {lateReports
+                          .filter(r => r.student.squad === '二区队')
+                          .map((report) => (
+                            <div key={report.id} className="p-3 flex items-center justify-between">
+                              <div>
+                                <span className="font-medium text-gray-900">{report.student.name}</span>
+                                <span className="text-gray-700 text-sm ml-2">({report.student.student_id})</span>
+                                <span className="text-gray-600 text-sm ml-3">导师：{report.student.advisor}</span>
+                              </div>
+                              <span className="text-xs text-gray-500">
+                                {new Date(report.submitted_at).toLocaleString('zh-CN')}
+                              </span>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* 导出按钮 */}
+            <div className="p-6 border-t space-y-4">
               {/* Excel导出 */}
               <div>
                 <h4 className="font-medium text-gray-700 mb-3">📊 导出Excel名单</h4>
                 <div className="grid grid-cols-3 gap-3">
                   <button
                     onClick={() => handleExportLateExcel('一区队')}
-                    className="px-4 py-3 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition flex flex-col items-center gap-1"
+                    disabled={lateReports.filter(r => r.student.squad === '一区队').length === 0}
+                    className="px-4 py-3 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed flex flex-col items-center gap-1"
                   >
                     <span className="text-lg">📊</span>
                     <span className="text-sm font-medium">一区队</span>
                   </button>
                   <button
                     onClick={() => handleExportLateExcel('二区队')}
-                    className="px-4 py-3 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition flex flex-col items-center gap-1"
+                    disabled={lateReports.filter(r => r.student.squad === '二区队').length === 0}
+                    className="px-4 py-3 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed flex flex-col items-center gap-1"
                   >
                     <span className="text-lg">📊</span>
                     <span className="text-sm font-medium">二区队</span>
                   </button>
                   <button
                     onClick={() => handleExportLateExcel()}
-                    className="px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition flex flex-col items-center gap-1"
+                    disabled={lateReports.length === 0}
+                    className="px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition disabled:bg-gray-300 disabled:cursor-not-allowed flex flex-col items-center gap-1"
                   >
                     <span className="text-lg">📊</span>
                     <span className="text-sm font-medium">全部</span>
@@ -707,33 +801,30 @@ export default function AdminDashboardPage() {
                 <div className="grid grid-cols-3 gap-3">
                   <button
                     onClick={() => handleExportLateSignatures('一区队')}
-                    className="px-4 py-3 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition flex flex-col items-center gap-1"
+                    disabled={lateReports.filter(r => r.student.squad === '一区队' && r.signature).length === 0}
+                    className="px-4 py-3 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed flex flex-col items-center gap-1"
                   >
                     <span className="text-lg">📁</span>
                     <span className="text-sm font-medium">一区队</span>
                   </button>
                   <button
                     onClick={() => handleExportLateSignatures('二区队')}
-                    className="px-4 py-3 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition flex flex-col items-center gap-1"
+                    disabled={lateReports.filter(r => r.student.squad === '二区队' && r.signature).length === 0}
+                    className="px-4 py-3 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed flex flex-col items-center gap-1"
                   >
                     <span className="text-lg">📁</span>
                     <span className="text-sm font-medium">二区队</span>
                   </button>
                   <button
                     onClick={() => handleExportLateSignatures()}
-                    className="px-4 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition flex flex-col items-center gap-1"
+                    disabled={lateReports.filter(r => r.signature).length === 0}
+                    className="px-4 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition disabled:bg-gray-300 disabled:cursor-not-allowed flex flex-col items-center gap-1"
                   >
                     <span className="text-lg">📁</span>
                     <span className="text-sm font-medium">全部</span>
                   </button>
                 </div>
               </div>
-            </div>
-
-            <div className="p-4 bg-gray-50 border-t rounded-b-xl">
-              <p className="text-sm text-gray-500 text-center">
-                晚交判定：超过第{lastWeek.weekNumber}周周一23:59提交
-              </p>
             </div>
           </div>
         </div>
