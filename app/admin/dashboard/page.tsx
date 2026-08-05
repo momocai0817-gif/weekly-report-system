@@ -207,11 +207,18 @@ export default function AdminDashboardPage() {
       </header>
 
       <main className="max-w-6xl mx-auto px-4 py-8">
-        {/* 当前周次信息 */}
-        <div className="mb-6">
+        {/* 当前周次信息 + 晚交名单入口 */}
+        <div className="mb-6 flex justify-between items-center">
           <h2 className="text-2xl font-bold text-gray-800">
             第 {currentWeek.weekNumber} 周 ({currentWeek.year}年)
           </h2>
+          <button
+            onClick={() => router.push('/admin/late-reports')}
+            className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition font-medium flex items-center gap-2 shadow-sm"
+          >
+            <span className="text-lg">⚠️</span>
+            查看晚交名单
+          </button>
         </div>
 
         {/* 统计卡片 */}
