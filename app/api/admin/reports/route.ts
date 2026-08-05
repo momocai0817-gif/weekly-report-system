@@ -25,11 +25,23 @@ function getWeekRange(week: number, year: number): { start: Date; end: Date } {
   return { start: weekStartMonday, end: weekEndSunday }
 }
 
-// 计算某周的截止时间（周一23:59）
+// 计算某周的截止时间（该周周一23:59:59.999）
 function getWeekDeadline(week: number, year: number): Date {
-  const range = getWeekRange(week, year)
-  const deadline = new Date(range.start)
+  const startDate = new Date(process.env.SEMESTER_START_DATE || '2025-02-24')
+  const startOfYear = new Date(year, 0, 1)
+  const startDateThisYear = new Date(year, startDate.getMonth(), startDate.getDate())
+
+  // 调整到当周的周一
+  const startDayOfWeek = startDateThisYear.getDay()
+  const daysToMonday = startDayOfWeek === 0 ? 6 : startDayOfWeek - 1
+  const startWeekMonday = new Date(startDateThisYear)
+  startWeekMonday.setDate(startWeekMonday.getDate() - daysToMonday)
+
+  // 计算目标周的开始日期（周一），并设置为23:59:59.999
+  const deadline = new Date(startWeekMonday)
+  deadline.setDate(deadline.getDate() + (week - 1) * 7)
   deadline.setHours(23, 59, 59, 999)
+
   return deadline
 }
 
@@ -71,11 +83,14 @@ export async function GET(request: NextRequest) {
     const weekRange = getWeekRange(parseInt(week), parseInt(year))
     const deadline = getWeekDeadline(parseInt(week), parseInt(year))
 
+    console.log(`=== 第${week}周 (${year}年) ===`)
+    console.log('截止时间:', deadline.toISOString(), deadline.toLocaleString('zh-CN'))
+
     // 标记晚交的记录：超过该周截止时间（周一23:59）提交的即为晚交
     const reportsWithLateStatus = (reports || []).map((report: any) => {
       const submittedAt = new Date(report.submitted_at)
-      // 检查是否超过截止时间（该周周一23:59）
       const isLate = submittedAt.getTime() > deadline.getTime()
+      console.log(`${report.student.name}: 提交于 ${submittedAt.toISOString()} (${submittedAt.toLocaleString('zh-CN')}) - ${isLate ? '晚交' : '按时'}`)
       return {
         ...report,
         is_late: isLate
