@@ -73,6 +73,12 @@ export default function AdminReportsPage() {
   const squad1Reports = reports.filter(r => r.student.squad === '一区队')
   const squad2Reports = reports.filter(r => r.student.squad === '二区队')
 
+  // 分离正常提交和晚交
+  const squad1Normal = squad1Reports.filter(r => !r.is_late)
+  const squad1Late = squad1Reports.filter(r => r.is_late)
+  const squad2Normal = squad2Reports.filter(r => !r.is_late)
+  const squad2Late = squad2Reports.filter(r => r.is_late)
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* 顶部导航 */}
@@ -159,28 +165,56 @@ export default function AdminReportsPage() {
           </div>
         ) : (
           <>
-            {/* 一区队 */}
-            {squad1Reports.length > 0 && (
-              <div className="bg-white rounded-xl shadow-sm mb-6">
+            {/* 一区队 - 正常提交 */}
+            {squad1Normal.length > 0 && (
+              <div className="bg-white rounded-xl shadow-sm mb-4">
                 <h2 className="font-medium text-gray-800 p-4 border-b">
-                  一区队 ({squad1Reports.length}人)
+                  一区队 ({squad1Normal.length}人)
                 </h2>
                 <div className="divide-y">
-                  {squad1Reports.map((report) => (
+                  {squad1Normal.map((report) => (
                     <ReportCard key={report.id} report={report} />
                   ))}
                 </div>
               </div>
             )}
 
-            {/* 二区队 */}
-            {squad2Reports.length > 0 && (
-              <div className="bg-white rounded-xl shadow-sm">
-                <h2 className="font-medium text-gray-800 p-4 border-b">
-                  二区队 ({squad2Reports.length}人)
+            {/* 一区队 - 晚交 */}
+            {squad1Late.length > 0 && (
+              <div className="bg-orange-50 rounded-xl shadow-sm mb-6 border border-orange-200">
+                <h2 className="font-medium text-orange-800 p-4 border-b border-orange-200">
+                  一区队 - 晚交 ({squad1Late.length}人)
                 </h2>
                 <div className="divide-y">
-                  {squad2Reports.map((report) => (
+                  {squad1Late.map((report) => (
+                    <ReportCard key={report.id} report={report} />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 二区队 - 正常提交 */}
+            {squad2Normal.length > 0 && (
+              <div className="bg-white rounded-xl shadow-sm mb-4">
+                <h2 className="font-medium text-gray-800 p-4 border-b">
+                  二区队 ({squad2Normal.length}人)
+                </h2>
+                <div className="divide-y">
+                  {squad2Normal.map((report) => (
+                    <ReportCard key={report.id} report={report} />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 二区队 - 晚交 */}
+            {squad2Late.length > 0 && (
+              <div className="bg-orange-50 rounded-xl shadow-sm border border-orange-200">
+                <h2 className="font-medium text-orange-800 p-4 border-b border-orange-200">
+                  二区队 - 晚交 ({squad2Late.length}人)
+                </h2>
+                <div className="divide-y">
+                  {squad2Late.map((report) => (
                     <ReportCard key={report.id} report={report} />
                   ))}
                 </div>
