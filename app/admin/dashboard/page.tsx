@@ -213,7 +213,7 @@ export default function AdminDashboardPage() {
       }
 
       const data = await response.json()
-      const lateReports = squad
+      let lateReports = squad
         ? data.lateReports.filter((r: any) => r.student.squad === squad)
         : data.lateReports
 
@@ -223,27 +223,131 @@ export default function AdminDashboardPage() {
       }
 
       const XLSX = require('xlsx')
-      const headers = ['姓名', '学号', '区队', '导师', '周次', '是否咨询导师', '导师是否回复', '提交时间']
 
-      const rows = lateReports.map((report: any) => [
-        report.student.name,
-        report.student.student_id,
-        report.student.squad,
-        report.student.advisor,
-        `${report.year}年第${report.week_number}周`,
-        report.contacted_professor ? '是' : '否',
-        report.contacted_professor ? (report.professor_replied ? '是' : '否') : '-',
-        new Date(report.submitted_at).toLocaleString('zh-CN')
-      ])
+      // 格式化时间
+      const formatDateTime = (date: string) => {
+        const d = new Date(date)
+        return d.toLocaleString('zh-CN', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+        })
+      }
 
-      const worksheet = XLSX.utils.aoa_to_sheet([headers, ...rows])
-      worksheet['!cols'] = [
-        { wch: 12 }, { wch: 15 }, { wch: 10 }, { wch: 12 },
-        { wch: 15 }, { wch: 12 }, { wch: 12 }, { wch: 20 },
+      // 创建自动换行样式
+      const createWrapCellStyle = () => ({
+        alignment: {
+          wrapText: true,
+          vertical: 'top',
+        },
+      })
+
+      // 按学号排序
+      lateReports.sort((a: any, b: any) =>
+        a.student.student_id.localeCompare(b.student.student_id, 'zh-CN', { numeric: true })
+      )
+
+      // 生成总表数据
+      const excelData = lateReports.map((report: any) => ({
+        '学号': report.student.student_id,
+        '姓名': report.student.name,
+        '区队': report.student.squad,
+        '导师': report.student.advisor,
+        '提交时间': formatDateTime(report.submitted_at),
+        '1.本周是否咨询过导师问题？': report.contacted_professor ? '是' : '否',
+        '2.未咨询原因/所处阶段': !report.contacted_professor ? (report.not_contacted_reason || '') : '',
+        '3.导师是否回复？': report.contacted_professor ? (report.professor_replied ? '是' : '否') : '',
+        '4.具体情况说明': (report.contacted_professor && report.professor_replied) ? (report.reply_details || '') : '',
+      }))
+
+      // 创建Excel工作簿
+      const workbook = XLSX.utils.book_new()
+
+      // 添加总表
+      const totalWorksheet = XLSX.utils.json_to_sheet(excelData)
+      totalWorksheet['!cols'] = [
+        { wch: 12 },  // 学号
+        { wch: 10 },  // 姓名
+        { wch: 10 },  // 区队
+        { wch: 10 },  // 导师
+        { wch: 18 },  // 提交时间
+        { wch: 10 },  // 问题1
+        { wch: 40 },  // 问题2
+        { wch: 8 },   // 问题3
+        { wch: 50 },  // 问题4
       ]
 
-      const workbook = XLSX.utils.book_new()
-      XLSX.utils.book_append_sheet(workbook, worksheet, '晚交名单')
+      // 设置自动换行样式
+      if (totalWorksheet['!ref']) {
+        const range = XLSX.utils.decode_range(totalWorksheet['!ref'])
+        for (let R = range.s.r; R <= range.e.r; ++R) {
+          const cellAddressG = XLSX.utils.encode_cell({ r: R, c: 6 })
+          if (totalWorksheet[cellAddressG]) {
+            totalWorksheet[cellAddressG].s = createWrapCellStyle()
+          }
+          const cellAddressI = XLSX.utils.encode_cell({ r: R, c: 8 })
+          if (totalWorksheet[cellAddressI]) {
+            totalWorksheet[cellAddressI].s = createWrapCellStyle()
+          }
+        }
+      }
+
+      XLSX.utils.book_append_sheet(workbook, totalWorksheet, '总表')
+
+      // 按导师分组生成sheet
+      const advisorGroups = new Map<string, any[]>()
+      lateReports.forEach((report: any) => {
+        const advisor = report.student.advisor || '未分配导师'
+        if (!advisorGroups.has(advisor)) {
+          advisorGroups.set(advisor, [])
+        }
+        advisorGroups.get(advisor)!.push({
+          '学号': report.student.student_id,
+          '姓名': report.student.name,
+          '区队': report.student.squad,
+          '导师': advisor,
+          '提交时间': formatDateTime(report.submitted_at),
+          '1.本周是否咨询过导师问题？': report.contacted_professor ? '是' : '否',
+          '2.未咨询原因/所处阶段': !report.contacted_professor ? (report.not_contacted_reason || '') : '',
+          '3.导师是否回复？': report.contacted_professor ? (report.professor_replied ? '是' : '否') : '',
+          '4.具体情况说明': (report.contacted_professor && report.professor_replied) ? (report.reply_details || '') : '',
+        })
+      })
+
+      // 按导师名字排序
+      const sortedAdvisors = Array.from(advisorGroups.keys()).sort((a, b) =>
+        a.localeCompare(b, 'zh-CN')
+      )
+
+      sortedAdvisors.forEach((advisor) => {
+        const advisorData = advisorGroups.get(advisor)!
+        const sheetName = advisor.length > 28 ? advisor.substring(0, 28) : advisor
+        const advisorWorksheet = XLSX.utils.json_to_sheet(advisorData)
+        advisorWorksheet['!cols'] = [
+          { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 10 },
+          { wch: 18 }, { wch: 10 }, { wch: 40 }, { wch: 8 }, { wch: 50 },
+        ]
+
+        // 设置自动换行样式
+        if (advisorWorksheet['!ref']) {
+          const range = XLSX.utils.decode_range(advisorWorksheet['!ref'])
+          for (let R = range.s.r; R <= range.e.r; ++R) {
+            const cellAddressG = XLSX.utils.encode_cell({ r: R, c: 6 })
+            if (advisorWorksheet[cellAddressG]) {
+              advisorWorksheet[cellAddressG].s = createWrapCellStyle()
+            }
+            const cellAddressI = XLSX.utils.encode_cell({ r: R, c: 8 })
+            if (advisorWorksheet[cellAddressI]) {
+              advisorWorksheet[cellAddressI].s = createWrapCellStyle()
+            }
+          }
+        }
+
+        XLSX.utils.book_append_sheet(workbook, advisorWorksheet, sheetName)
+      })
+
       XLSX.writeFile(workbook, squad
         ? `${squad}_晚交名单_第${lastWeek.weekNumber}周.xlsx`
         : `晚交名单_第${lastWeek.weekNumber}周.xlsx`
