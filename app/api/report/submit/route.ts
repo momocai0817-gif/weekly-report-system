@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
     // 计算当前周的截止时间（下周一23:59）
     const currentWeekMonday = currentWeek.monday
     const currentWeekDeadline = new Date(currentWeekMonday)
-    currentWeekDeadline.setDate(currentWeekDeadline.getDate() + 7)
+    currentWeekDeadline.setDate(currentWeekDeadline.getDate() + 7)  // 下周一 = 周一 + 7天
     currentWeekDeadline.setHours(23, 59, 59, 999)
 
     // 计算下一周的截止时间（下下周一23:59）

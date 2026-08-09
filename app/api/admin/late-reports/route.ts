@@ -24,7 +24,7 @@ function getWeekRange(week: number, year: number): { start: Date; end: Date } {
   return { start: weekStartMonday, end: weekEndSunday }
 }
 
-// 计算某周的截止时间（下周一23:59:59.999）
+// 计算某周的截止时间（本周日23:59:59.999）
 function getWeekDeadline(week: number, year: number): Date {
   const startDate = new Date(process.env.SEMESTER_START_DATE || '2026-03-02')
   const startDateThisYear = new Date(year, startDate.getMonth(), startDate.getDate())
@@ -37,7 +37,7 @@ function getWeekDeadline(week: number, year: number): Date {
 
   // 计算目标周的下周一（截止时间），并设置为23:59:59.999
   const deadline = new Date(startWeekMonday)
-  deadline.setDate(deadline.getDate() + (week - 1) * 7 + 7)  // 下周一
+  deadline.setDate(deadline.getDate() + (week - 1) * 7 + 7)  // 下周一 = 周一 + 7天
   deadline.setHours(23, 59, 59, 999)
 
   return deadline
