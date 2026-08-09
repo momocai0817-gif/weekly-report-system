@@ -498,12 +498,12 @@ export default function AdminDashboardPage() {
           </button>
 
           <button
-            onClick={() => router.push('/admin/archive')}
+            onClick={() => router.push('/admin/late-reports')}
             className="bg-white rounded-xl shadow-sm p-4 text-left hover:shadow-md transition"
           >
-            <div className="text-2xl mb-2">📦</div>
-            <h4 className="font-medium text-gray-800">历史归档</h4>
-            <p className="text-sm text-gray-500">查看历史记录</p>
+            <div className="text-2xl mb-2">⏰</div>
+            <h4 className="font-medium text-gray-800">晚交名单</h4>
+            <p className="text-sm text-gray-500">查看晚交学生名单</p>
           </button>
 
           <button
