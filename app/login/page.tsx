@@ -26,6 +26,9 @@ export default function LoginPage() {
     setLoading(true)
     setError('')
 
+    // DEBUG: 打印发送的数据
+    console.log('学生登录 - 发送的数据:', studentForm)
+
     try {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
@@ -37,6 +40,7 @@ export default function LoginPage() {
       })
 
       const data = await response.json()
+      console.log('学生登录 - 响应:', data)
 
       if (!response.ok) {
         throw new Error(data.error || '登录失败')
