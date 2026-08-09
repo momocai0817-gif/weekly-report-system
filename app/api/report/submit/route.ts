@@ -72,30 +72,13 @@ export async function POST(request: NextRequest) {
 
     const supabase = createServiceClient()
 
-    // 计算本周和上周的周次
+    // 计算当前应该提交到哪一周
     const submittedAt = new Date()
     const weeks = getTargetWeek(submittedAt, studentId, supabase)
 
-    // 检查上周是否已提交
-    const { data: lastWeekReport } = await supabase
-      .from('weekly_reports')
-      .select('id')
-      .eq('student_id', studentId)
-      .eq('week_number', weeks.lastWeek.weekNumber)
-      .eq('year', weeks.lastWeek.year)
-      .single()
-
-    // 确定应该提交到哪一周
-    let targetWeek, isLate
-    if (lastWeekReport) {
-      // 上周已交，提交到本周
-      targetWeek = weeks.thisWeek
-      isLate = false
-    } else {
-      // 上周没交，提交到上周（晚交）
-      targetWeek = weeks.lastWeek
-      isLate = true
-    }
+    // 直接提交到本周，不再进行复杂的上周判断
+    const targetWeek = weeks.thisWeek
+    const isLate = false
 
     // 检查该周是否已存在报告，如果存在则删除后重新插入（覆盖）
     const { data: existing } = await supabase
