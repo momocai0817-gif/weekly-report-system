@@ -20,7 +20,6 @@ interface Report {
   not_contacted_reason: string | null
   signature: string | null
   submitted_at: string
-  is_late?: boolean
 }
 
 export default function AdminReportsPage() {
@@ -73,8 +72,8 @@ export default function AdminReportsPage() {
   const exportReports = (data: Report[], filename: string) => {
     if (data.length === 0) return
 
-    // Excel数据
-    const headers = ['姓名', '学号', '区队', '导师', '周次', '是否晚交', '是否咨询导师', '导师是否回复', '提交时间']
+    // Excel数据（移除"是否晚交"列）
+    const headers = ['姓名', '学号', '区队', '导师', '周次', '是否咨询导师', '导师是否回复', '提交时间']
 
     const rows = data.map(report => [
       report.student.name,
@@ -82,7 +81,6 @@ export default function AdminReportsPage() {
       report.student.squad,
       report.student.advisor,
       `${report.year}年第${report.week_number}周`,
-      report.is_late ? '是' : '否',
       report.contacted_professor ? '是' : '否',
       report.contacted_professor ? (report.professor_replied ? '是' : '否') : '-',
       formatDateTime(report.submitted_at)
@@ -99,7 +97,6 @@ export default function AdminReportsPage() {
       { wch: 10 }, // 区队
       { wch: 12 }, // 导师
       { wch: 15 }, // 周次
-      { wch: 10 }, // 是否晚交
       { wch: 12 }, // 是否咨询导师
       { wch: 12 }, // 导师是否回复
       { wch: 20 }, // 提交时间
@@ -115,12 +112,6 @@ export default function AdminReportsPage() {
   // 按区队分组
   const squad1Reports = reports.filter(r => r.student.squad === '一区队')
   const squad2Reports = reports.filter(r => r.student.squad === '二区队')
-
-  // 分离正常提交和晚交
-  const squad1Normal = squad1Reports.filter(r => !r.is_late)
-  const squad1Late = squad1Reports.filter(r => r.is_late)
-  const squad2Normal = squad2Reports.filter(r => !r.is_late)
-  const squad2Late = squad2Reports.filter(r => r.is_late)
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -196,27 +187,13 @@ export default function AdminReportsPage() {
             <span className="text-gray-500 ml-4">
               共 {reports.length} 份报告
             </span>
-            <div className="ml-auto flex gap-2">
+            <div className="ml-auto">
               <button
-                onClick={() => exportReports(reports.filter(r => !r.is_late), `${selectedYear}年第${selectedWeek}周-正常提交`)}
-                disabled={reports.filter(r => !r.is_late).length === 0}
+                onClick={() => exportReports(reports, `${selectedYear}年第${selectedWeek}周-周报记录`)}
+                disabled={reports.length === 0}
                 className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
               >
-                导出正常提交
-              </button>
-              <button
-                onClick={() => exportReports(reports.filter(r => r.is_late), `${selectedYear}年第${selectedWeek}周-晚交`)}
-                disabled={reports.filter(r => r.is_late).length === 0}
-                className="px-3 py-1 text-sm bg-orange-600 text-white rounded hover:bg-orange-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
-              >
-                导出晚交记录
-              </button>
-              <button
-                onClick={() => exportReports(reports, `${selectedYear}年第${selectedWeek}周-全部`)}
-                disabled={reports.length === 0}
-                className="px-3 py-1 text-sm bg-gray-600 text-white rounded hover:bg-gray-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
-              >
-                导出全部
+                导出周报
               </button>
             </div>
           </div>
@@ -231,56 +208,28 @@ export default function AdminReportsPage() {
           </div>
         ) : (
           <>
-            {/* 一区队 - 正常提交 */}
-            {squad1Normal.length > 0 && (
+            {/* 一区队 */}
+            {squad1Reports.length > 0 && (
               <div className="bg-white rounded-xl shadow-sm mb-4">
                 <h2 className="font-medium text-gray-800 p-4 border-b">
-                  一区队 ({squad1Normal.length}人)
+                  一区队 ({squad1Reports.length}人)
                 </h2>
                 <div className="divide-y">
-                  {squad1Normal.map((report) => (
+                  {squad1Reports.map((report) => (
                     <ReportCard key={report.id} report={report} />
                   ))}
                 </div>
               </div>
             )}
 
-            {/* 一区队 - 晚交 */}
-            {squad1Late.length > 0 && (
-              <div className="bg-orange-50 rounded-xl shadow-sm mb-6 border border-orange-200">
-                <h2 className="font-medium text-orange-800 p-4 border-b border-orange-200">
-                  一区队 - 晚交 ({squad1Late.length}人)
-                </h2>
-                <div className="divide-y">
-                  {squad1Late.map((report) => (
-                    <ReportCard key={report.id} report={report} />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* 二区队 - 正常提交 */}
-            {squad2Normal.length > 0 && (
-              <div className="bg-white rounded-xl shadow-sm mb-4">
+            {/* 二区队 */}
+            {squad2Reports.length > 0 && (
+              <div className="bg-white rounded-xl shadow-sm">
                 <h2 className="font-medium text-gray-800 p-4 border-b">
-                  二区队 ({squad2Normal.length}人)
+                  二区队 ({squad2Reports.length}人)
                 </h2>
                 <div className="divide-y">
-                  {squad2Normal.map((report) => (
-                    <ReportCard key={report.id} report={report} />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* 二区队 - 晚交 */}
-            {squad2Late.length > 0 && (
-              <div className="bg-orange-50 rounded-xl shadow-sm border border-orange-200">
-                <h2 className="font-medium text-orange-800 p-4 border-b border-orange-200">
-                  二区队 - 晚交 ({squad2Late.length}人)
-                </h2>
-                <div className="divide-y">
-                  {squad2Late.map((report) => (
+                  {squad2Reports.map((report) => (
                     <ReportCard key={report.id} report={report} />
                   ))}
                 </div>
@@ -310,11 +259,6 @@ function ReportCard({ report }: { report: Report }) {
             </span>
           </div>
           <div className="mt-2 flex items-center gap-4 text-sm">
-            {report.is_late && (
-              <span className="px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 text-xs font-medium">
-                晚交
-              </span>
-            )}
             <span
               className={`px-2 py-0.5 rounded-full ${
                 report.contacted_professor
