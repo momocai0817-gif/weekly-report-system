@@ -39,6 +39,20 @@ function getWeekMonday(weekNumber: number, year: number): Date {
   return weekMonday
 }
 
+// 计算当前是第几周
+function getCurrentWeek(now: Date): { weekNumber: number; year: number; monday: Date } {
+  const currentDay = now.getDay()
+  let daysSinceMonday = currentDay - 1
+  if (daysSinceMonday < 0) daysSinceMonday += 7
+
+  const thisMonday = new Date(now)
+  thisMonday.setDate(now.getDate() - daysSinceMonday)
+  thisMonday.setHours(0, 0, 0, 0)
+
+  const weekInfo = getWeekNumber(thisMonday)
+  return { ...weekInfo, monday: thisMonday }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
@@ -54,72 +68,71 @@ export async function POST(request: NextRequest) {
     const supabase = createServiceClient()
     const now = new Date()
 
-    // 从第24周开始，逐周检查截止时间
-    // 找到第一个截止时间在当前时间之后的周
-    let targetWeekNumber = 24
-    let targetYear = now.getFullYear()
-    let found = false
-    let isLate = false
-    let previousWeekHasSubmitted = false
+    // 获取当前周次
+    const currentWeek = getCurrentWeek(now)
 
-    // 最多检查10周
-    for (let i = 0; i < 10; i++) {
-      const weekNum = targetWeekNumber + i
-      const weekMonday = getWeekMonday(weekNum, targetYear)
+    // 计算当前周的截止时间（下周一23:59）
+    const currentWeekMonday = currentWeek.monday
+    const currentWeekDeadline = new Date(currentWeekMonday)
+    currentWeekDeadline.setDate(currentWeekDeadline.getDate() + 7)
+    currentWeekDeadline.setHours(23, 59, 59, 999)
 
-      // 计算该周的截止时间（下周一23:59）
-      const weekDeadline = new Date(weekMonday)
-      weekDeadline.setDate(weekDeadline.getDate() + 7)
-      weekDeadline.setHours(23, 59, 59, 999)
+    // 计算下一周的截止时间（下下周一23:59）
+    const nextWeekMonday = new Date(currentWeekMonday)
+    nextWeekMonday.setDate(nextWeekMonday.getDate() + 7)
+    const nextWeekDeadline = new Date(nextWeekMonday)
+    nextWeekDeadline.setDate(nextWeekDeadline.getDate() + 7)
+    nextWeekDeadline.setHours(23, 59, 59, 999)
 
-      if (now.getTime() <= weekDeadline.getTime()) {
-        // 找到了！当前时间在这个周的截止时间之前
-        targetWeekNumber = weekNum
-        found = true
+    let targetWeek, isLate
 
-        // 检查前一周是否已提交（如果是第24周，则没有前一周，或者前一周已结束）
-        if (weekNum > 24) {
-          const prevWeekNum = weekNum - 1
-          const { data: prevWeekReport } = await supabase
-            .from('weekly_reports')
-            .select('id')
-            .eq('student_id', studentId)
-            .eq('week_number', prevWeekNum)
-            .eq('year', targetYear)
-            .single()
+    // 判断应该提交到哪一周
+    if (now.getTime() <= currentWeekDeadline.getTime()) {
+      // 在当前周截止时间之前 → 提交到当前周（正常）
+      targetWeek = currentWeek
+      isLate = false
+    } else if (now.getTime() <= nextWeekDeadline.getTime()) {
+      // 在当前周截止时间之后，但在下一周截止时间之前
+      // 检查该学生在当前周是否已提交
+      const { data: currentWeekReport } = await supabase
+        .from('weekly_reports')
+        .select('id')
+        .eq('student_id', studentId)
+        .eq('week_number', currentWeek.weekNumber)
+        .eq('year', currentWeek.year)
+        .single()
 
-          // 如果前一周没提交，当前提交算晚交
-          if (!prevWeekReport) {
-            targetWeekNumber = prevWeekNum
-            isLate = true
-          } else {
-            // 前一周已提交，检查本周是否已提交
-            const { data: currentWeekReport } = await supabase
-              .from('weekly_reports')
-              .select('id')
-              .eq('student_id', studentId)
-              .eq('week_number', weekNum)
-              .eq('year', targetYear)
-              .single()
-
-            if (currentWeekReport) {
-              // 本周已提交，跳到下一周
-              targetWeekNumber = weekNum + 1
-            }
-          }
-        }
-        break
+      if (currentWeekReport) {
+        // 当前周已提交 → 提交到下一周（正常）
+        targetWeek = { weekNumber: currentWeek.weekNumber + 1, year: currentWeek.year, monday: nextWeekMonday }
+        isLate = false
+      } else {
+        // 当前周未提交 → 提交到当前周（晚交）
+        targetWeek = currentWeek
+        isLate = true
       }
-    }
+    } else {
+      // 在下一周截止时间之后 → 检查是否下一周已提交
+      const nextWeekNumber = currentWeek.weekNumber + 1
+      const { data: nextWeekReport } = await supabase
+        .from('weekly_reports')
+        .select('id')
+        .eq('student_id', studentId)
+        .eq('week_number', nextWeekNumber)
+        .eq('year', currentWeek.year)
+        .single()
 
-    if (!found) {
-      return NextResponse.json(
-        { error: '无法确定提交周次' },
-        { status: 400 }
-      )
-    }
+      if (nextWeekReport) {
+        // 下一周已提交，无法重复提交
+        return NextResponse.json(
+          { error: `第${nextWeekNumber}周已提交周报，如需修改请重新提交` },
+          { status: 409 }
+        )
+      }
 
-    const targetWeek = { weekNumber: targetWeekNumber, year: targetYear }
+      targetWeek = { weekNumber: nextWeekNumber, year: currentWeek.year, monday: nextWeekMonday }
+      isLate = true
+    }
 
     // 检查该周是否已存在报告，如果存在则删除后重新插入（覆盖）
     const { data: existing } = await supabase
@@ -180,7 +193,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       report: data,
-      targetWeek: targetWeek,
+      targetWeek: { weekNumber: targetWeek.weekNumber, year: targetWeek.year },
       isLate: isLate,
     })
   } catch (error) {
