@@ -121,11 +121,8 @@ function StudentReportContent() {
     }
 
     try {
-      const endpoint = existingReport
-        ? `/api/report/update?id=${existingReport.id}`
-        : '/api/report/submit'
-
-      const response = await fetch(endpoint, {
+      // 始终使用提交接口，允许覆盖已提交的周报
+      const response = await fetch('/api/report/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -143,11 +140,9 @@ function StudentReportContent() {
         throw new Error(data.error || '提交失败')
       }
 
-      setMessage(existingReport ? '更新成功！' : '提交成功！')
+      setMessage('提交成功！')
 
-      if (!existingReport) {
-        setExistingReport(data.report)
-      }
+      setExistingReport(data.report)
 
       setTimeout(() => setMessage(''), 3000)
     } catch (err: any) {

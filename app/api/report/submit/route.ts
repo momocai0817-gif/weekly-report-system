@@ -97,20 +97,21 @@ export async function POST(request: NextRequest) {
       isLate = true
     }
 
-    // 检查该周是否已存在报告
+    // 检查该周是否已存在报告，如果存在则删除后重新插入（覆盖）
     const { data: existing } = await supabase
       .from('weekly_reports')
-      .select('*')
+      .select('id')
       .eq('student_id', studentId)
       .eq('week_number', targetWeek.weekNumber)
       .eq('year', targetWeek.year)
       .single()
 
     if (existing) {
-      return NextResponse.json(
-        { error: `第${targetWeek.weekNumber}周已提交周报，如需修改请使用更新功能` },
-        { status: 409 }
-      )
+      // 删除旧报告
+      await supabase
+        .from('weekly_reports')
+        .delete()
+        .eq('id', existing.id)
     }
 
     // 构建插入数据对象
