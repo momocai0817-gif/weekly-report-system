@@ -1,39 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase'
 
-// 根据提交时间计算周次（考虑上周是否已交）
-function getTargetWeek(submittedAt: Date, studentId: string, supabase: any): {
-  thisWeek: { weekNumber: number; year: number }
-  lastWeek: { weekNumber: number; year: number }
-} {
-  // 先计算当前应该是第几周
-  const deadline = process.env.WEEKLY_DEADLINE || 'Monday 23:59'
-  const [day, time] = deadline.split(' ')
-  const [hour, minute] = time.split(':').map(Number)
-
-  const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-  const targetDay = daysOfWeek.indexOf(day)
-
-  const currentDay = submittedAt.getDay()
-
-  // 计算本周的周一
-  let daysSinceMonday = currentDay - 1
-  if (daysSinceMonday < 0) {
-    daysSinceMonday += 7
-  }
-
-  const thisMonday = new Date(submittedAt)
-  thisMonday.setDate(submittedAt.getDate() - daysSinceMonday)
-  thisMonday.setHours(0, 0, 0, 0)
-
-  // 计算上周的周一
-  const lastMonday = new Date(thisMonday)
-  lastMonday.setDate(lastMonday.getDate() - 7)
-
-  // 计算本周的周次
-  const startDate = new Date(process.env.SEMESTER_START_DATE || '2025-02-24')
-  const year = thisMonday.getFullYear()
-  const startOfYear = new Date(year, 0, 1)
+// 计算周次
+function getWeekNumber(monday: Date): { weekNumber: number; year: number } {
+  const startDate = new Date(process.env.SEMESTER_START_DATE || '2026-02-23')
+  const year = monday.getFullYear()
   const startDateThisYear = new Date(year, startDate.getMonth(), startDate.getDate())
 
   const startDayOfWeek = startDateThisYear.getDay()
@@ -41,21 +12,31 @@ function getTargetWeek(submittedAt: Date, studentId: string, supabase: any): {
   const startWeekMonday = new Date(startDateThisYear)
   startWeekMonday.setDate(startWeekMonday.getDate() - daysToMonday)
 
-  const actualStartWeekMonday = thisMonday < startWeekMonday
+  const actualStartWeekMonday = monday < startWeekMonday
     ? new Date(year - 1, startWeekMonday.getMonth(), startWeekMonday.getDate())
     : startWeekMonday
 
-  const diffTime = thisMonday.getTime() - actualStartWeekMonday.getTime()
+  const diffTime = monday.getTime() - actualStartWeekMonday.getTime()
   const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24))
-  const thisWeekNumber = Math.floor(diffDays / 7) + 1
-  const lastWeekNumber = thisWeekNumber - 1
-  const lastWeekYear = lastWeekNumber < 1 ? year - 1 : year
+  const weekNumber = Math.floor(diffDays / 7) + 1
 
-  // 检查上周是否已提交（异步函数中不能直接用await，需要在调用处处理）
-  return {
-    thisWeek: { weekNumber: thisWeekNumber, year },
-    lastWeek: { weekNumber: lastWeekNumber < 1 ? 52 : lastWeekNumber, year: lastWeekNumber < 1 ? year - 1 : year }
-  }
+  return { weekNumber, year }
+}
+
+// 计算某周的周一
+function getWeekMonday(weekNumber: number, year: number): Date {
+  const startDate = new Date(process.env.SEMESTER_START_DATE || '2026-02-23')
+  const startDateThisYear = new Date(year, startDate.getMonth(), startDate.getDate())
+
+  const startDayOfWeek = startDateThisYear.getDay()
+  const daysToMonday = startDayOfWeek === 0 ? 6 : startDayOfWeek - 1
+  const startWeekMonday = new Date(startDateThisYear)
+  startWeekMonday.setDate(startWeekMonday.getDate() - daysToMonday)
+
+  const weekMonday = new Date(startWeekMonday)
+  weekMonday.setDate(weekMonday.getDate() + (weekNumber - 1) * 7)
+
+  return weekMonday
 }
 
 export async function POST(request: NextRequest) {
@@ -71,14 +52,74 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = createServiceClient()
+    const now = new Date()
 
-    // 计算当前应该提交到哪一周
-    const submittedAt = new Date()
-    const weeks = getTargetWeek(submittedAt, studentId, supabase)
+    // 从第24周开始，逐周检查截止时间
+    // 找到第一个截止时间在当前时间之后的周
+    let targetWeekNumber = 24
+    let targetYear = now.getFullYear()
+    let found = false
+    let isLate = false
+    let previousWeekHasSubmitted = false
 
-    // 直接提交到本周，不再进行复杂的上周判断
-    const targetWeek = weeks.thisWeek
-    const isLate = false
+    // 最多检查10周
+    for (let i = 0; i < 10; i++) {
+      const weekNum = targetWeekNumber + i
+      const weekMonday = getWeekMonday(weekNum, targetYear)
+
+      // 计算该周的截止时间（下周一23:59）
+      const weekDeadline = new Date(weekMonday)
+      weekDeadline.setDate(weekDeadline.getDate() + 7)
+      weekDeadline.setHours(23, 59, 59, 999)
+
+      if (now.getTime() <= weekDeadline.getTime()) {
+        // 找到了！当前时间在这个周的截止时间之前
+        targetWeekNumber = weekNum
+        found = true
+
+        // 检查前一周是否已提交（如果是第24周，则没有前一周，或者前一周已结束）
+        if (weekNum > 24) {
+          const prevWeekNum = weekNum - 1
+          const { data: prevWeekReport } = await supabase
+            .from('weekly_reports')
+            .select('id')
+            .eq('student_id', studentId)
+            .eq('week_number', prevWeekNum)
+            .eq('year', targetYear)
+            .single()
+
+          // 如果前一周没提交，当前提交算晚交
+          if (!prevWeekReport) {
+            targetWeekNumber = prevWeekNum
+            isLate = true
+          } else {
+            // 前一周已提交，检查本周是否已提交
+            const { data: currentWeekReport } = await supabase
+              .from('weekly_reports')
+              .select('id')
+              .eq('student_id', studentId)
+              .eq('week_number', weekNum)
+              .eq('year', targetYear)
+              .single()
+
+            if (currentWeekReport) {
+              // 本周已提交，跳到下一周
+              targetWeekNumber = weekNum + 1
+            }
+          }
+        }
+        break
+      }
+    }
+
+    if (!found) {
+      return NextResponse.json(
+        { error: '无法确定提交周次' },
+        { status: 400 }
+      )
+    }
+
+    const targetWeek = { weekNumber: targetWeekNumber, year: targetYear }
 
     // 检查该周是否已存在报告，如果存在则删除后重新插入（覆盖）
     const { data: existing } = await supabase
@@ -90,7 +131,6 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (existing) {
-      // 删除旧报告
       await supabase
         .from('weekly_reports')
         .delete()
@@ -108,19 +148,16 @@ export async function POST(request: NextRequest) {
       signature: signature || null,
     }
 
-    // 添加 not_contacted_reason 字段（向后兼容）
     if (not_contacted_reason !== undefined) {
       insertData.not_contacted_reason = !contacted_professor ? not_contacted_reason : null
     }
 
-    // 先尝试插入
     let { data, error } = await supabase
       .from('weekly_reports')
       .insert(insertData)
       .select()
       .single()
 
-    // 如果错误是因为 not_contacted_reason 字段不存在，则重试不包含该字段
     if (error && error.message && error.message.includes('not_contacted_reason')) {
       const { not_contacted_reason: _, ...insertDataRetry } = insertData
       const result = await supabase
