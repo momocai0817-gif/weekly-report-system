@@ -5,65 +5,82 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-// 计算当前是第几周（基于学期开始日期）
-export function getCurrentWeek(): { weekNumber: number; year: number } {
+// 北京时间固定为 UTC+8（中国不实行夏令时，自 1991 年起固定不变）。
+// 这里用固定偏移而非 Intl，并全程只用 getUTC*/Date.UTC，确保计算与服务器宿主时区无关
+// （无论服务器跑在 UTC 还是 Asia/Shanghai，结果都按北京时间一致）。
+const SHANGHAI_OFFSET_MS = 8 * 60 * 60 * 1000
+
+// 取绝对时刻 now 对应的「北京墙钟」各字段。原理：北京墙钟 = UTC + 8h，
+// 故 now + 8h 后读取 UTC 字段即得北京墙钟的年/月/日/星期/时/分/秒/毫秒。
+function getShanghaiParts(now: Date) {
+  const s = new Date(now.getTime() + SHANGHAI_OFFSET_MS)
+  return {
+    year: s.getUTCFullYear(),
+    month: s.getUTCMonth(), // 0-11
+    date: s.getUTCDate(),
+    weekday: s.getUTCDay(), // 0=周日 … 6=周六（按北京日历）
+    hour: s.getUTCHours(),
+    minute: s.getUTCMinutes(),
+    second: s.getUTCSeconds(),
+    ms: s.getUTCMilliseconds(),
+  }
+}
+
+// 由北京墙钟各字段构造对应的绝对时刻（epoch ms）。Date.UTC 会自动归一化越界的日/月。
+function shanghaiToEpoch(
+  year: number, month: number, date: number,
+  hour: number, minute: number, second: number, ms: number,
+): number {
+  return Date.UTC(year, month, date, hour, minute, second, ms) - SHANGHAI_OFFSET_MS
+}
+
+// 计算当前是第几周（基于学期开始日期）。
+// 周的定义：北京时间 周一 23:59 → 下周一 23:59。
+// 提交时间未过「本周一 23:59（北京时间）」截止点时，周报归属上一周；过了截止点则归属本周。
+// 传入 now 以便服务端（提交接口）与客户端（页面展示）共用同一份逻辑，避免周次漂移。
+export function getCurrentWeek(now: Date = new Date()): { weekNumber: number; year: number } {
   const deadline = process.env.WEEKLY_DEADLINE || 'Monday 23:59'
-  const [day, time] = deadline.split(' ')
-  const [hour, minute] = time.split(':').map(Number)
-
-  const now = new Date()
+  const [dayName, time] = deadline.split(' ')
+  const [dHour, dMinute] = time.split(':').map(Number)
   const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-  const targetDay = daysOfWeek.indexOf(day)
+  const targetWeekday = daysOfWeek.indexOf(dayName) // 周一 = 1
 
-  const currentDay = now.getDay()
+  const p = getShanghaiParts(now)
 
-  // 计算本周截止日期（最近的周一，可能是今天或之前）
-  let daysSinceTarget = currentDay - targetDay
-  if (daysSinceTarget < 0) {
-    daysSinceTarget += 7
+  // 本周（北京日历）目标日(周一)距离今天的天数：当天=0，次日=1，…，周日=6
+  const daysSinceTarget = (p.weekday - targetWeekday + 7) % 7
+  // 本周目标日（周一）的日期（可能 ≤0，跨月时由 Date.UTC 归一化）
+  const mondayDate = p.date - daysSinceTarget
+
+  // 本周截止时刻（绝对）：北京墙钟「本周一 hh:mm:59.999」
+  const deadlineEpoch = shanghaiToEpoch(p.year, p.month, mondayDate, dHour, dMinute, 59, 999)
+
+  // 周报归属的「锚点周一」（北京墙钟）：未过截止点 -> 上一周一；已过 -> 本周一
+  const anchorDate = now.getTime() > deadlineEpoch ? mondayDate : mondayDate - 7
+  const anchorEpoch = shanghaiToEpoch(p.year, p.month, anchorDate, 0, 0, 0, 0)
+  const anchorYear = new Date(anchorEpoch + SHANGHAI_OFFSET_MS).getUTCFullYear()
+
+  // 学期起点（按北京日历解析 'YYYY-MM-DD'）
+  const startDateStr = process.env.SEMESTER_START_DATE || '2025-02-24'
+  const [sYear, sMonth, sDate] = startDateStr.split('-').map(Number)
+  // 某年学期起点所在周的周一（北京墙钟 00:00 的绝对时刻）
+  const semesterStartEpoch = (year: number) => {
+    const wd = new Date(Date.UTC(year, sMonth - 1, sDate)).getUTCDay()
+    const daysToMonday = (wd - 1 + 7) % 7
+    return shanghaiToEpoch(year, sMonth - 1, sDate - daysToMonday, 0, 0, 0, 0)
   }
 
-  // 计算本周截止日期
-  const deadlineDate = new Date(now)
-  deadlineDate.setDate(now.getDate() - daysSinceTarget)
-  deadlineDate.setHours(hour, minute, 59, 999)
-
-  // 根据是否已过截止时间来确定周报所属的周
-  // 截止时间（周一23:59）之前：填写上一周的周报（使用上周一计算周次）
-  // 截止时间之后：填写本周的周报（使用本周一计算周次）
-  let weekStartMonday: Date
-  if (now.getTime() > deadlineDate.getTime()) {
-    // 已过截止时间：使用本周一00:00
-    weekStartMonday = new Date(deadlineDate)
-    weekStartMonday.setHours(0, 0, 0, 0)
-  } else {
-    // 未过截止时间：使用上周一00:00
-    weekStartMonday = new Date(deadlineDate)
-    weekStartMonday.setDate(weekStartMonday.getDate() - 7)
-    weekStartMonday.setHours(0, 0, 0, 0)
+  // 取不晚于锚点周一的最近一个学期起点；若本年学期起点晚于锚点，则回退到上一年
+  let startEpoch = semesterStartEpoch(anchorYear)
+  if (startEpoch > anchorEpoch) {
+    startEpoch = semesterStartEpoch(anchorYear - 1)
   }
 
-  const startDate = new Date(process.env.SEMESTER_START_DATE || '2025-02-24')
-  const year = weekStartMonday.getFullYear()
-  const startOfYear = new Date(year, 0, 1)
-  // 学期开始的周一（用于计算周次）
-  const startDateThisYear = new Date(year, startDate.getMonth(), startDate.getDate())
-  const startWeekMonday = new Date(startDateThisYear)
-  // 调整到当周的周一
-  const startDayOfWeek = startDateThisYear.getDay()
-  const daysToMonday = startDayOfWeek === 0 ? 6 : startDayOfWeek - 1
-  startWeekMonday.setDate(startWeekMonday.getDate() - daysToMonday)
-
-  // 如果当前日期在本学期开始之前，使用去年的学期开始日期
-  const actualStartWeekMonday = weekStartMonday < startWeekMonday
-    ? new Date(year - 1, startWeekMonday.getMonth(), startWeekMonday.getDate())
-    : startWeekMonday
-
-  const diffTime = weekStartMonday.getTime() - actualStartWeekMonday.getTime()
-  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24))
+  const dayMs = 24 * 60 * 60 * 1000
+  const diffDays = Math.round((anchorEpoch - startEpoch) / dayMs)
   const weekNumber = Math.floor(diffDays / 7) + 1
 
-  return { weekNumber, year }
+  return { weekNumber, year: anchorYear }
 }
 
 // 格式化日期

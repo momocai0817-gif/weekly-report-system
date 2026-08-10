@@ -1,28 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase'
-
-// 计算当前是第几周
-function getCurrentWeek(now: Date): { weekNumber: number; year: number; monday: Date } {
-  const startDate = new Date(process.env.SEMESTER_START_DATE || '2026-02-23')
-  const currentDay = now.getDay()
-  let daysSinceMonday = currentDay - 1
-  if (daysSinceMonday < 0) daysSinceMonday += 7
-
-  const thisMonday = new Date(now)
-  thisMonday.setDate(now.getDate() - daysSinceMonday)
-  thisMonday.setHours(0, 0, 0, 0)
-
-  const startDayOfWeek = startDate.getDay()
-  const daysToMonday = startDayOfWeek === 0 ? 6 : startDayOfWeek - 1
-  const startWeekMonday = new Date(startDate)
-  startWeekMonday.setDate(startWeekMonday.getDate() - daysToMonday)
-
-  const diffTime = thisMonday.getTime() - startWeekMonday.getTime()
-  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24))
-  const weekNumber = Math.floor(diffDays / 7) + 1
-
-  return { weekNumber, year: thisMonday.getFullYear(), monday: thisMonday }
-}
+import { getCurrentWeek } from '@/lib/utils'
 
 export async function POST(request: NextRequest) {
   try {
