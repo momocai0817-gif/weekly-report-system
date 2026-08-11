@@ -77,16 +77,6 @@ export default function AdminReportsPage() {
   const exportReports = (data: Report[], filename: string) => {
     if (data.length === 0) return
 
-    // 调试：检查新字段是否存在
-    console.log('=== 导出调试信息 ===')
-    data.forEach((report, index) => {
-      console.log(`${index + 1}. ${report.student.name}:`)
-      console.log(`  - preparation_work: ${report.preparation_work ? '有内容 (' + report.preparation_work.length + '字)' : '空/NULL'}`)
-      console.log(`  - question_list: ${report.question_list ? '有内容 (' + report.question_list.length + '字)' : '空/NULL'}`)
-      console.log(`  - advisor_feedback: ${report.advisor_feedback ? '有内容 (' + report.advisor_feedback.length + '字)' : '空/NULL'}`)
-      console.log(`  - follow_up_plan: ${report.follow_up_plan ? '有内容 (' + report.follow_up_plan.length + '字)' : '空/NULL'}`)
-    })
-
     // Excel数据
     const headers = ['姓名', '学号', '区队', '导师', '周次', '是否咨询导师', '导师是否回复', '未咨询原因', '准备工作', '问题清单', '导师反馈', '后续计划', '提交时间']
 
