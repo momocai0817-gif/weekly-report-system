@@ -119,7 +119,7 @@ function StudentReportContent() {
     if (formData.contacted_professor && formData.professor_replied) {
       // 验证准备工作（最少100字）
       if (!formData.preparation_work.trim()) {
-        setError('请填写准备工作：详细说明你为本次咨询做了哪些准备、了解了什么问题（≥100字）')
+        setError('请填写准备工作：详细描述你为本次咨询所做的准备工作（≥100字）')
         setSubmitting(false)
         return
       }
@@ -290,7 +290,7 @@ function StudentReportContent() {
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
               <h4 className="font-medium text-blue-800 mb-2">📝 填写要求</h4>
               <ul className="text-sm text-blue-700 space-y-1">
-                <li>• <strong>准备工作：</strong>详细说明你为本次咨询做了哪些准备、了解了什么问题（≥100字）</li>
+                <li>• <strong>准备工作：</strong>详细描述你为本次咨询所做的准备工作：包括研读的文献资料、梳理的数据或笔记、撰写的草稿或大纲，以及除查阅外的其他实践环节（≥100字）</li>
                 <li>• <strong>问题清单：</strong>列出至少2个具体要咨询的问题</li>
                 <li>• <strong>导师反馈：</strong>记录导师的具体指导内容（≥50字）</li>
                 <li>• <strong>后续计划：</strong>说明基于反馈的下一步行动（≥30字）</li>
@@ -425,7 +425,7 @@ function StudentReportContent() {
                     }
                     rows={3}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none resize-none placeholder-gray-500 text-gray-900"
-                    placeholder="请详细说明你为本次咨询做了哪些准备、了解了什么问题：阅读了哪些文献/资料、整理了什么材料/数据、撰写了哪些文档/草稿等..."
+                    placeholder="请详细描述你为本次咨询所做的准备工作：包括研读的文献资料、梳理的数据或笔记、撰写的草稿或大纲，以及除查阅外的其他实践环节（如访谈情况、问卷设计、代码调试等），请确保内容详实。"
                   />
                   <div className="mt-1 text-sm text-gray-500">
                     {formData.preparation_work.trim().length}/100
