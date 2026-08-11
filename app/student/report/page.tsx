@@ -115,8 +115,8 @@ function StudentReportContent() {
       return
     }
 
-    // 验证：结构化字段 - 当咨询过且导师回复时
-    if (formData.contacted_professor && formData.professor_replied) {
+    // 验证：准备工作和问题清单 - 只要咨询过就必填
+    if (formData.contacted_professor) {
       // 验证准备工作（最少100字）
       if (!formData.preparation_work.trim()) {
         setError('请填写准备工作：详细描述你为本次咨询所做的准备工作（≥100字）')
@@ -137,28 +137,31 @@ function StudentReportContent() {
         return
       }
 
-      // 验证导师反馈（最少50字）
-      if (!formData.advisor_feedback.trim()) {
-        setError('请填写导师反馈：记录导师的具体指导内容（≥50字）')
-        setSubmitting(false)
-        return
-      }
-      if (formData.advisor_feedback.trim().length < 50) {
-        setError(`导师反馈记录需至少50字，当前${formData.advisor_feedback.trim().length}字`)
-        setSubmitting(false)
-        return
-      }
+      // 验证导师反馈和后续计划 - 只有导师回复时才必填
+      if (formData.professor_replied) {
+        // 验证导师反馈（最少50字）
+        if (!formData.advisor_feedback.trim()) {
+          setError('请填写导师反馈：记录导师的具体指导内容（≥50字）')
+          setSubmitting(false)
+          return
+        }
+        if (formData.advisor_feedback.trim().length < 50) {
+          setError(`导师反馈记录需至少50字，当前${formData.advisor_feedback.trim().length}字`)
+          setSubmitting(false)
+          return
+        }
 
-      // 验证后续计划（最少30字）
-      if (!formData.follow_up_plan.trim()) {
-        setError('请填写后续计划：说明基于导师反馈的下一步行动（≥30字）')
-        setSubmitting(false)
-        return
-      }
-      if (formData.follow_up_plan.trim().length < 30) {
-        setError(`后续计划需至少30字，当前${formData.follow_up_plan.trim().length}字`)
-        setSubmitting(false)
-        return
+        // 验证后续计划（最少30字）
+        if (!formData.follow_up_plan.trim()) {
+          setError('请填写后续计划：说明基于导师反馈的下一步行动（≥30字）')
+          setSubmitting(false)
+          return
+        }
+        if (formData.follow_up_plan.trim().length < 30) {
+          setError(`后续计划需至少30字，当前${formData.follow_up_plan.trim().length}字`)
+          setSubmitting(false)
+          return
+        }
       }
     }
 
@@ -286,14 +289,18 @@ function StudentReportContent() {
           </h3>
 
           {/* 填写要求 */}
-          {formData.contacted_professor && formData.professor_replied && (
+          {formData.contacted_professor && (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
               <h4 className="font-medium text-blue-800 mb-2">📝 填写要求</h4>
               <ul className="text-sm text-blue-700 space-y-1">
                 <li>• <strong>准备工作：</strong>详细描述你为本次咨询所做的准备工作（≥100字）</li>
                 <li>• <strong>问题清单：</strong>列出至少2个具体要咨询的问题</li>
-                <li>• <strong>导师反馈：</strong>记录导师的具体指导内容（≥50字）</li>
-                <li>• <strong>后续计划：</strong>说明基于反馈的下一步行动（≥30字）</li>
+                {formData.professor_replied && (
+                  <>
+                    <li>• <strong>导师反馈：</strong>记录导师的具体指导内容（≥50字）</li>
+                    <li>• <strong>后续计划：</strong>说明基于反馈的下一步行动（≥30字）</li>
+                  </>
+                )}
               </ul>
             </div>
           )}
@@ -406,8 +413,8 @@ function StudentReportContent() {
               </div>
             )}
 
-            {/* 结构化字段 - 仅当咨询过且导师回复时显示 */}
-            {formData.contacted_professor && formData.professor_replied && (
+            {/* 准备工作和问题清单 - 仅当咨询过时显示 */}
+            {formData.contacted_professor && (
               <div className="space-y-6 animate-in fade-in slide-in-from-top-2 duration-300">
                 {/* 准备工作 */}
                 <div>
@@ -471,7 +478,12 @@ function StudentReportContent() {
                     )}
                   </div>
                 </div>
+              </div>
+            )}
 
+            {/* 导师反馈和后续计划 - 仅当咨询过且导师回复时显示 */}
+            {formData.contacted_professor && formData.professor_replied && (
+              <div className="space-y-6 animate-in fade-in slide-in-from-top-2 duration-300">
                 {/* 导师反馈 */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -529,7 +541,8 @@ function StudentReportContent() {
             {/* 签名区域 */}
             <div className="border-t pt-6">
               <label className="block text-sm font-medium text-gray-700 mb-3">
-                {!formData.contacted_professor ? '3. 学生签名' : formData.professor_replied ? '7. 学生签名' : '3. 学生签名'} <span className="text-red-500">*</span>
+                {!formData.contacted_professor ? '3. 学生签名' :
+                 !formData.professor_replied ? '6. 学生签名' : '8. 学生签名'} <span className="text-red-500">*</span>
               </label>
               <SignatureCanvas
                 value={signature}
