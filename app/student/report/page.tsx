@@ -357,7 +357,7 @@ function StudentReportContent() {
                     })
                   }
                   rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none resize-none placeholder-gray-600 text-gray-900"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none resize-none placeholder-gray-500 text-gray-900"
                   placeholder="请说明未咨询导师的原因，或描述当前论文写作进度/所处阶段..."
                 />
               </div>
@@ -424,7 +424,7 @@ function StudentReportContent() {
                       })
                     }
                     rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none resize-none placeholder-gray-600 text-gray-900"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none resize-none placeholder-gray-500 text-gray-900"
                     placeholder="请详细说明你为本次咨询做了哪些准备、了解了什么问题：阅读了哪些文献/资料、整理了什么材料/数据、撰写了哪些文档/草稿等..."
                   />
                   <div className="mt-1 text-sm text-gray-500">
@@ -458,7 +458,7 @@ function StudentReportContent() {
                               questions: newQuestions,
                             })
                           }}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none placeholder-gray-600 text-gray-900"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none placeholder-gray-500 text-gray-900"
                           placeholder={`请输入第${index + 1}个问题...`}
                         />
                       </div>
@@ -487,7 +487,7 @@ function StudentReportContent() {
                       })
                     }
                     rows={5}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none resize-none placeholder-gray-600 text-gray-900"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none resize-none placeholder-gray-500 text-gray-900"
                     placeholder="请记录导师的具体指导内容：针对你问题的直接回答、给出的建议和意见、指出的不足和改进方向、推荐的资源或参考文献等..."
                   />
                   <div className="mt-1 text-sm text-gray-500">
@@ -513,7 +513,7 @@ function StudentReportContent() {
                       })
                     }
                     rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none resize-none placeholder-gray-600 text-gray-900"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none resize-none placeholder-gray-500 text-gray-900"
                     placeholder="请说明基于导师反馈的下一步计划：根据导师建议，你需要做什么？下次咨询前要完成什么？"
                   />
                   <div className="mt-1 text-sm text-gray-500">
