@@ -31,7 +31,7 @@ function StudentReportContent() {
     not_contacted_reason: '',
     // 结构化字段
     preparation_work: '',
-    question_list: '',
+    questions: ['', '', ''], // 3个独立的问题输入框
     advisor_feedback: '',
     follow_up_plan: '',
   })
@@ -70,6 +70,15 @@ function StudentReportContent() {
 
       if (data.report) {
         setExistingReport(data.report)
+        // 将 question_list 转换为 questions 数组
+        const existingQuestions = data.report.question_list
+          ? data.report.question_list.split('\n').slice(0, 3)
+          : ['', '', '']
+        // 补齐到3个问题
+        while (existingQuestions.length < 3) {
+          existingQuestions.push('')
+        }
+
         setFormData({
           contacted_professor: data.report.contacted_professor,
           professor_replied: data.report.professor_replied || false,
@@ -77,7 +86,7 @@ function StudentReportContent() {
           not_contacted_reason: data.report.not_contacted_reason || '',
           // 结构化字段
           preparation_work: data.report.preparation_work || '',
-          question_list: data.report.question_list || '',
+          questions: existingQuestions,
           advisor_feedback: data.report.advisor_feedback || '',
           follow_up_plan: data.report.follow_up_plan || '',
         })
@@ -121,9 +130,9 @@ function StudentReportContent() {
       }
 
       // 验证问题清单（至少2个问题）
-      const questions = formData.question_list.split('\n').filter(q => q.trim().length > 0)
-      if (questions.length < 2) {
-        setError('请至少列出2个具体的咨询问题，每个问题一行')
+      const validQuestions = formData.questions.filter(q => q.trim().length > 0)
+      if (validQuestions.length < 2) {
+        setError('请至少列出2个具体的咨询问题')
         setSubmitting(false)
         return
       }
@@ -170,6 +179,8 @@ function StudentReportContent() {
           weekNumber: currentWeek.weekNumber,
           year: currentWeek.year,
           ...formData,
+          // 将 questions 数组转换为换行分隔的字符串存储
+          question_list: formData.questions.filter(q => q.trim()).join('\n'),
           signature,
         }),
       })
@@ -274,32 +285,16 @@ function StudentReportContent() {
             {existingReport ? '修改周报' : '填写本周周报'}
           </h3>
 
-          {/* 填写要求和示例 */}
+          {/* 填写要求 */}
           {formData.contacted_professor && formData.professor_replied && (
-            <div className="space-y-4 mb-6">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <h4 className="font-medium text-blue-800 mb-2">📝 填写要求</h4>
-                <ul className="text-sm text-blue-700 space-y-1">
-                  <li>• <strong>准备工作：</strong>详细说明你为本次咨询做了哪些准备（≥50字）</li>
-                  <li>• <strong>问题清单：</strong>列出至少2个具体要咨询的问题</li>
-                  <li>• <strong>导师反馈：</strong>记录导师的具体指导内容（≥100字）</li>
-                  <li>• <strong>后续计划：</strong>说明基于反馈的下一步行动（≥30字）</li>
-                </ul>
-              </div>
-
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                <h4 className="font-medium text-green-800 mb-2">✅ 填写示例</h4>
-                <div className="text-sm text-green-700 space-y-2">
-                  <p><strong>准备工作：</strong>本周阅读了5篇关于XX的文献，整理了XX相关数据，完成了文献综述草稿，并列出了3个拟研究的问题。</p>
-                  <p><strong>问题清单：</strong>
-                    1. 我的研究问题是否过于宽泛？如何缩小范围？
-                    2. 应该选择哪些机器学习算法进行对比？
-                    3. 如何评价模型性能的指标是否合理？
-                  </p>
-                  <p><strong>导师反馈：</strong>导师指出我的研究问题确实过于宽泛，建议缩小范围到"基于深度学习的肺结节检测"。推荐阅读XX教授2024年的论文作为参考，并要求在方法部分增加算法复杂度分析。指导下周完成更具体的开题报告修改，重点明确创新点和可行性分析。</p>
-                  <p><strong>后续计划：</strong>根据导师建议，将研究范围缩小到肺结节检测，重新查阅相关文献10篇（重点XX教授论文），下周提交修订后的开题报告，增加算法复杂度分析部分。</p>
-                </div>
-              </div>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+              <h4 className="font-medium text-blue-800 mb-2">📝 填写要求</h4>
+              <ul className="text-sm text-blue-700 space-y-1">
+                <li>• <strong>准备工作：</strong>详细说明你为本次咨询做了哪些准备（≥50字）</li>
+                <li>• <strong>问题清单：</strong>列出至少2个具体要咨询的问题</li>
+                <li>• <strong>导师反馈：</strong>记录导师的具体指导内容（≥100字）</li>
+                <li>• <strong>后续计划：</strong>说明基于反馈的下一步行动（≥30字）</li>
+              </ul>
             </div>
           )}
 
@@ -433,7 +428,7 @@ function StudentReportContent() {
                     placeholder="请详细说明你为本次咨询做了哪些准备：阅读了哪些文献/资料、整理了什么材料/数据、撰写了哪些文档/草稿等..."
                   />
                   <div className="mt-1 text-sm text-gray-500">
-                    字数统计：{formData.preparation_work.trim().length}
+                    {formData.preparation_work.trim().length}/50
                     {formData.preparation_work.trim().length > 0 && formData.preparation_work.trim().length < 50 && (
                       <span className="text-red-500 ml-2">需至少50字</span>
                     )}
@@ -446,21 +441,32 @@ function StudentReportContent() {
                     4. 问题清单 <span className="text-red-500">*</span>
                     <span className="text-gray-500 font-normal ml-2">（至少2个具体问题）</span>
                   </label>
-                  <textarea
-                    value={formData.question_list}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        question_list: e.target.value,
-                      })
-                    }
-                    rows={4}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none resize-none placeholder-gray-700 text-gray-900"
-                    placeholder="请列出你准备咨询的具体问题（每个问题一行）：&#10;问题1：...&#10;问题2：...&#10;问题3：..."
-                  />
+                  <div className="space-y-2">
+                    {[0, 1, 2].map((index) => (
+                      <div key={index}>
+                        <label className="block text-xs text-gray-600 mb-1">
+                          问题 {index + 1}
+                        </label>
+                        <input
+                          type="text"
+                          value={formData.questions[index]}
+                          onChange={(e) => {
+                            const newQuestions = [...formData.questions]
+                            newQuestions[index] = e.target.value
+                            setFormData({
+                              ...formData,
+                              questions: newQuestions,
+                            })
+                          }}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none placeholder-gray-700 text-gray-900"
+                          placeholder={`请输入第${index + 1}个问题...`}
+                        />
+                      </div>
+                    ))}
+                  </div>
                   <div className="mt-1 text-sm text-gray-500">
-                    已列出：{formData.question_list.split('\n').filter(q => q.trim().length > 0).length} 个问题
-                    {formData.question_list.split('\n').filter(q => q.trim().length > 0).length > 0 && formData.question_list.split('\n').filter(q => q.trim().length > 0).length < 2 && (
+                    已填写：{formData.questions.filter(q => q.trim().length > 0).length}/2
+                    {formData.questions.filter(q => q.trim().length > 0).length > 0 && formData.questions.filter(q => q.trim().length > 0).length < 2 && (
                       <span className="text-red-500 ml-2">需至少2个问题</span>
                     )}
                   </div>
@@ -485,7 +491,7 @@ function StudentReportContent() {
                     placeholder="请记录导师的具体指导内容：针对你问题的直接回答、给出的建议和意见、指出的不足和改进方向、推荐的资源或参考文献等..."
                   />
                   <div className="mt-1 text-sm text-gray-500">
-                    字数统计：{formData.advisor_feedback.trim().length}
+                    {formData.advisor_feedback.trim().length}/100
                     {formData.advisor_feedback.trim().length > 0 && formData.advisor_feedback.trim().length < 100 && (
                       <span className="text-red-500 ml-2">需至少100字</span>
                     )}
@@ -511,7 +517,7 @@ function StudentReportContent() {
                     placeholder="请说明基于导师反馈的下一步计划：根据导师建议，你需要做什么？下次咨询前要完成什么？"
                   />
                   <div className="mt-1 text-sm text-gray-500">
-                    字数统计：{formData.follow_up_plan.trim().length}
+                    {formData.follow_up_plan.trim().length}/30
                     {formData.follow_up_plan.trim().length > 0 && formData.follow_up_plan.trim().length < 30 && (
                       <span className="text-red-500 ml-2">需至少30字</span>
                     )}
