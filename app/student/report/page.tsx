@@ -29,6 +29,11 @@ function StudentReportContent() {
     professor_replied: false,
     reply_details: '',
     not_contacted_reason: '',
+    // 结构化字段
+    preparation_work: '',
+    question_list: '',
+    advisor_feedback: '',
+    follow_up_plan: '',
   })
 
   // 签名状态
@@ -70,6 +75,11 @@ function StudentReportContent() {
           professor_replied: data.report.professor_replied || false,
           reply_details: data.report.reply_details || '',
           not_contacted_reason: data.report.not_contacted_reason || '',
+          // 结构化字段
+          preparation_work: data.report.preparation_work || '',
+          question_list: data.report.question_list || '',
+          advisor_feedback: data.report.advisor_feedback || '',
+          follow_up_plan: data.report.follow_up_plan || '',
         })
         // 加载已有的签名
         if (data.report.signature) {
@@ -96,18 +106,48 @@ function StudentReportContent() {
       return
     }
 
-    // 验证：第一题选"是"且第二题选"是"时必须填写具体情况说明
-    if (formData.contacted_professor && formData.professor_replied && !formData.reply_details.trim()) {
-      setError('请填写第3题：具体情况说明（50-100字）')
-      setSubmitting(false)
-      return
-    }
+    // 验证：结构化字段 - 当咨询过且导师回复时
+    if (formData.contacted_professor && formData.professor_replied) {
+      // 验证准备工作（最少50字）
+      if (!formData.preparation_work.trim()) {
+        setError('请填写准备工作：详细说明你为本次咨询做了哪些准备（≥50字）')
+        setSubmitting(false)
+        return
+      }
+      if (formData.preparation_work.trim().length < 50) {
+        setError(`准备工作描述需至少50字，当前${formData.preparation_work.trim().length}字`)
+        setSubmitting(false)
+        return
+      }
 
-    // 验证：具体情况说明字数限制（50-100字）
-    if (formData.contacted_professor && formData.professor_replied && formData.reply_details.trim()) {
-      const wordCount = formData.reply_details.trim().length
-      if (wordCount < 50 || wordCount > 100) {
-        setError(`具体情况说明需在50-100字之间，当前${wordCount}字`)
+      // 验证问题清单（至少2个问题）
+      const questions = formData.question_list.split('\n').filter(q => q.trim().length > 0)
+      if (questions.length < 2) {
+        setError('请至少列出2个具体的咨询问题，每个问题一行')
+        setSubmitting(false)
+        return
+      }
+
+      // 验证导师反馈（最少100字）
+      if (!formData.advisor_feedback.trim()) {
+        setError('请填写导师反馈：记录导师的具体指导内容（≥100字）')
+        setSubmitting(false)
+        return
+      }
+      if (formData.advisor_feedback.trim().length < 100) {
+        setError(`导师反馈记录需至少100字，当前${formData.advisor_feedback.trim().length}字`)
+        setSubmitting(false)
+        return
+      }
+
+      // 验证后续计划（最少30字）
+      if (!formData.follow_up_plan.trim()) {
+        setError('请填写后续计划：说明基于导师反馈的下一步行动（≥30字）')
+        setSubmitting(false)
+        return
+      }
+      if (formData.follow_up_plan.trim().length < 30) {
+        setError(`后续计划需至少30字，当前${formData.follow_up_plan.trim().length}字`)
         setSubmitting(false)
         return
       }
@@ -234,6 +274,35 @@ function StudentReportContent() {
             {existingReport ? '修改周报' : '填写本周周报'}
           </h3>
 
+          {/* 填写要求和示例 */}
+          {formData.contacted_professor && formData.professor_replied && (
+            <div className="space-y-4 mb-6">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h4 className="font-medium text-blue-800 mb-2">📝 填写要求</h4>
+                <ul className="text-sm text-blue-700 space-y-1">
+                  <li>• <strong>准备工作：</strong>详细说明你为本次咨询做了哪些准备（≥50字）</li>
+                  <li>• <strong>问题清单：</strong>列出至少2个具体要咨询的问题</li>
+                  <li>• <strong>导师反馈：</strong>记录导师的具体指导内容（≥100字）</li>
+                  <li>• <strong>后续计划：</strong>说明基于反馈的下一步行动（≥30字）</li>
+                </ul>
+              </div>
+
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                <h4 className="font-medium text-green-800 mb-2">✅ 填写示例</h4>
+                <div className="text-sm text-green-700 space-y-2">
+                  <p><strong>准备工作：</strong>本周阅读了5篇关于XX的文献，整理了XX相关数据，完成了文献综述草稿，并列出了3个拟研究的问题。</p>
+                  <p><strong>问题清单：</strong>
+                    1. 我的研究问题是否过于宽泛？如何缩小范围？
+                    2. 应该选择哪些机器学习算法进行对比？
+                    3. 如何评价模型性能的指标是否合理？
+                  </p>
+                  <p><strong>导师反馈：</strong>导师指出我的研究问题确实过于宽泛，建议缩小范围到"基于深度学习的肺结节检测"。推荐阅读XX教授2024年的论文作为参考，并要求在方法部分增加算法复杂度分析。指导下周完成更具体的开题报告修改，重点明确创新点和可行性分析。</p>
+                  <p><strong>后续计划：</strong>根据导师建议，将研究范围缩小到肺结节检测，重新查阅相关文献10篇（重点XX教授论文），下周提交修订后的开题报告，增加算法复杂度分析部分。</p>
+                </div>
+              </div>
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* 问题1：是否咨询过老师 */}
             <div>
@@ -342,30 +411,111 @@ function StudentReportContent() {
               </div>
             )}
 
-            {/* 具体情况说明 - 仅当咨询过且导师回复时显示 */}
+            {/* 结构化字段 - 仅当咨询过且导师回复时显示 */}
             {formData.contacted_professor && formData.professor_replied && (
-              <div className="animate-in fade-in slide-in-from-top-2 duration-300">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  3. 具体情况说明 <span className="text-red-500">*</span>
-                  <span className="text-gray-500 font-normal ml-2">（50-100字）</span>
-                </label>
-                <textarea
-                  value={formData.reply_details}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      reply_details: e.target.value,
-                    })
-                  }
-                  rows={4}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none resize-none placeholder-gray-700 text-gray-900"
-                  placeholder="请描述咨询的内容和导师的回复情况..."
-                />
-                <div className="mt-1 text-sm text-gray-500">
-                  字数统计：{formData.reply_details.trim().length}/100
-                  {formData.reply_details.trim().length > 0 && (formData.reply_details.trim().length < 50 || formData.reply_details.trim().length > 100) && (
-                    <span className="text-red-500 ml-2">需在50-100字之间</span>
-                  )}
+              <div className="space-y-6 animate-in fade-in slide-in-from-top-2 duration-300">
+                {/* 准备工作 */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    3. 准备工作 <span className="text-red-500">*</span>
+                    <span className="text-gray-500 font-normal ml-2">（≥50字）</span>
+                  </label>
+                  <textarea
+                    value={formData.preparation_work}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        preparation_work: e.target.value,
+                      })
+                    }
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none resize-none placeholder-gray-700 text-gray-900"
+                    placeholder="请详细说明你为本次咨询做了哪些准备：阅读了哪些文献/资料、整理了什么材料/数据、撰写了哪些文档/草稿等..."
+                  />
+                  <div className="mt-1 text-sm text-gray-500">
+                    字数统计：{formData.preparation_work.trim().length}
+                    {formData.preparation_work.trim().length > 0 && formData.preparation_work.trim().length < 50 && (
+                      <span className="text-red-500 ml-2">需至少50字</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* 问题清单 */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    4. 问题清单 <span className="text-red-500">*</span>
+                    <span className="text-gray-500 font-normal ml-2">（至少2个具体问题）</span>
+                  </label>
+                  <textarea
+                    value={formData.question_list}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        question_list: e.target.value,
+                      })
+                    }
+                    rows={4}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none resize-none placeholder-gray-700 text-gray-900"
+                    placeholder="请列出你准备咨询的具体问题（每个问题一行）：&#10;问题1：...&#10;问题2：...&#10;问题3：..."
+                  />
+                  <div className="mt-1 text-sm text-gray-500">
+                    已列出：{formData.question_list.split('\n').filter(q => q.trim().length > 0).length} 个问题
+                    {formData.question_list.split('\n').filter(q => q.trim().length > 0).length > 0 && formData.question_list.split('\n').filter(q => q.trim().length > 0).length < 2 && (
+                      <span className="text-red-500 ml-2">需至少2个问题</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* 导师反馈 */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    5. 导师反馈 <span className="text-red-500">*</span>
+                    <span className="text-gray-500 font-normal ml-2">（≥100字）</span>
+                  </label>
+                  <textarea
+                    value={formData.advisor_feedback}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        advisor_feedback: e.target.value,
+                      })
+                    }
+                    rows={5}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none resize-none placeholder-gray-700 text-gray-900"
+                    placeholder="请记录导师的具体指导内容：针对你问题的直接回答、给出的建议和意见、指出的不足和改进方向、推荐的资源或参考文献等..."
+                  />
+                  <div className="mt-1 text-sm text-gray-500">
+                    字数统计：{formData.advisor_feedback.trim().length}
+                    {formData.advisor_feedback.trim().length > 0 && formData.advisor_feedback.trim().length < 100 && (
+                      <span className="text-red-500 ml-2">需至少100字</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* 后续计划 */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    6. 后续计划 <span className="text-red-500">*</span>
+                    <span className="text-gray-500 font-normal ml-2">（≥30字）</span>
+                  </label>
+                  <textarea
+                    value={formData.follow_up_plan}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        follow_up_plan: e.target.value,
+                      })
+                    }
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none resize-none placeholder-gray-700 text-gray-900"
+                    placeholder="请说明基于导师反馈的下一步计划：根据导师建议，你需要做什么？下次咨询前要完成什么？"
+                  />
+                  <div className="mt-1 text-sm text-gray-500">
+                    字数统计：{formData.follow_up_plan.trim().length}
+                    {formData.follow_up_plan.trim().length > 0 && formData.follow_up_plan.trim().length < 30 && (
+                      <span className="text-red-500 ml-2">需至少30字</span>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
@@ -373,7 +523,7 @@ function StudentReportContent() {
             {/* 签名区域 */}
             <div className="border-t pt-6">
               <label className="block text-sm font-medium text-gray-700 mb-3">
-                {!formData.contacted_professor ? '3. 学生签名' : formData.professor_replied ? '4. 学生签名' : '3. 学生签名'} <span className="text-red-500">*</span>
+                {!formData.contacted_professor ? '3. 学生签名' : formData.professor_replied ? '7. 学生签名' : '3. 学生签名'} <span className="text-red-500">*</span>
               </label>
               <SignatureCanvas
                 value={signature}

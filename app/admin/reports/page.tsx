@@ -20,6 +20,11 @@ interface Report {
   not_contacted_reason: string | null
   signature: string | null
   submitted_at: string
+  // 新增结构化字段
+  preparation_work?: string | null
+  question_list?: string | null
+  advisor_feedback?: string | null
+  follow_up_plan?: string | null
 }
 
 export default function AdminReportsPage() {
@@ -72,8 +77,8 @@ export default function AdminReportsPage() {
   const exportReports = (data: Report[], filename: string) => {
     if (data.length === 0) return
 
-    // Excel数据（移除"是否晚交"列）
-    const headers = ['姓名', '学号', '区队', '导师', '周次', '是否咨询导师', '导师是否回复', '提交时间']
+    // Excel数据
+    const headers = ['姓名', '学号', '区队', '导师', '周次', '是否咨询导师', '导师是否回复', '未咨询原因', '准备工作', '问题清单', '导师反馈', '后续计划', '提交时间']
 
     const rows = data.map(report => [
       report.student.name,
@@ -83,6 +88,11 @@ export default function AdminReportsPage() {
       `${report.year}年第${report.week_number}周`,
       report.contacted_professor ? '是' : '否',
       report.contacted_professor ? (report.professor_replied ? '是' : '否') : '-',
+      report.not_contacted_reason || '',
+      report.preparation_work || '',
+      report.question_list || '',
+      report.advisor_feedback || '',
+      report.follow_up_plan || '',
       formatDateTime(report.submitted_at)
     ])
 
@@ -99,6 +109,11 @@ export default function AdminReportsPage() {
       { wch: 15 }, // 周次
       { wch: 12 }, // 是否咨询导师
       { wch: 12 }, // 导师是否回复
+      { wch: 30 }, // 未咨询原因
+      { wch: 40 }, // 准备工作
+      { wch: 30 }, // 问题清单
+      { wch: 50 }, // 导师反馈
+      { wch: 30 }, // 后续计划
       { wch: 20 }, // 提交时间
     ]
 
@@ -284,7 +299,7 @@ function ReportCard({ report }: { report: Report }) {
             </span>
           </div>
         </div>
-        {(report.contacted_professor || report.not_contacted_reason || report.signature) && (
+        {(report.contacted_professor || report.not_contacted_reason || report.signature || report.preparation_work || report.question_list || report.advisor_feedback || report.follow_up_plan) && (
           <button
             onClick={() => setExpanded(!expanded)}
             className="text-sm text-blue-600 hover:text-blue-800"
@@ -309,6 +324,39 @@ function ReportCard({ report }: { report: Report }) {
               <p className="text-xs text-gray-500 mb-1">具体情况说明：</p>
               <p className="text-sm text-gray-800 whitespace-pre-wrap">
                 {report.reply_details}
+              </p>
+            </div>
+          )}
+          {/* 结构化字段 */}
+          {report.preparation_work && (
+            <div className="p-3 bg-blue-50 rounded-lg">
+              <p className="text-xs text-blue-600 mb-1">准备工作：</p>
+              <p className="text-sm text-gray-800 whitespace-pre-wrap">
+                {report.preparation_work}
+              </p>
+            </div>
+          )}
+          {report.question_list && (
+            <div className="p-3 bg-green-50 rounded-lg">
+              <p className="text-xs text-green-600 mb-1">问题清单：</p>
+              <p className="text-sm text-gray-800 whitespace-pre-wrap">
+                {report.question_list}
+              </p>
+            </div>
+          )}
+          {report.advisor_feedback && (
+            <div className="p-3 bg-purple-50 rounded-lg">
+              <p className="text-xs text-purple-600 mb-1">导师反馈：</p>
+              <p className="text-sm text-gray-800 whitespace-pre-wrap">
+                {report.advisor_feedback}
+              </p>
+            </div>
+          )}
+          {report.follow_up_plan && (
+            <div className="p-3 bg-orange-50 rounded-lg">
+              <p className="text-xs text-orange-600 mb-1">后续计划：</p>
+              <p className="text-sm text-gray-800 whitespace-pre-wrap">
+                {report.follow_up_plan}
               </p>
             </div>
           )}
