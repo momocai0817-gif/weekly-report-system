@@ -93,15 +93,18 @@ export function formatDate(date: Date | string): string {
   })
 }
 
-// 格式化日期时间
+// 格式化日期时间（严格按北京时间）
 export function formatDateTime(date: Date | string): string {
   const d = typeof date === 'string' ? new Date(date) : date
-  return d.toLocaleString('zh-CN', {
+  // 使用北京时间（UTC+8）格式化
+  const chinaTime = new Date(d.getTime() + SHANGHAI_OFFSET_MS)
+  return chinaTime.toLocaleString('zh-CN', {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
+    timeZone: 'Asia/Shanghai'
   })
 }
 
