@@ -31,7 +31,7 @@ function StudentReportContent() {
     not_contacted_reason: '',
     // 结构化字段
     preparation_work: '',
-    questions: ['', '', ''], // 3个独立的问题输入框
+    questions: ['', ''], // 2个独立的问题输入框
     advisor_feedback: '',
     follow_up_plan: '',
   })
@@ -72,10 +72,10 @@ function StudentReportContent() {
         setExistingReport(data.report)
         // 将 question_list 转换为 questions 数组
         const existingQuestions = data.report.question_list
-          ? data.report.question_list.split('\n').slice(0, 3)
-          : ['', '', '']
-        // 补齐到3个问题
-        while (existingQuestions.length < 3) {
+          ? data.report.question_list.split('\n').slice(0, 2)
+          : ['', '']
+        // 补齐到2个问题
+        while (existingQuestions.length < 2) {
           existingQuestions.push('')
         }
 
@@ -117,22 +117,22 @@ function StudentReportContent() {
 
     // 验证：准备工作和问题清单 - 只要咨询过就必填
     if (formData.contacted_professor) {
-      // 验证准备工作（最少100字）
+      // 验证准备工作（最少50字）
       if (!formData.preparation_work.trim()) {
-        setError('请填写准备工作：详细描述你为本次咨询所做的准备工作（≥100字）')
+        setError('请填写准备工作：详细描述你为本次咨询所做的准备工作（≥50字）')
         setSubmitting(false)
         return
       }
-      if (formData.preparation_work.trim().length < 100) {
-        setError(`准备工作描述需至少100字，当前${formData.preparation_work.trim().length}字`)
+      if (formData.preparation_work.trim().length < 50) {
+        setError(`准备工作描述需至少50字，当前${formData.preparation_work.trim().length}字`)
         setSubmitting(false)
         return
       }
 
-      // 验证问题清单（至少2个问题）
+      // 验证问题清单（至少1个问题）
       const validQuestions = formData.questions.filter(q => q.trim().length > 0)
-      if (validQuestions.length < 2) {
-        setError('请至少列出2个具体的咨询问题')
+      if (validQuestions.length < 1) {
+        setError('请至少列出1个具体的咨询问题')
         setSubmitting(false)
         return
       }
@@ -293,8 +293,8 @@ function StudentReportContent() {
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
               <h4 className="font-medium text-blue-800 mb-2">📝 填写要求</h4>
               <ul className="text-sm text-blue-700 space-y-1">
-                <li>• <strong>准备工作：</strong>详细描述你为本次咨询所做的准备工作（≥100字）</li>
-                <li>• <strong>问题清单：</strong>列出至少2个具体要咨询的问题</li>
+                <li>• <strong>准备工作：</strong>详细描述你为本次咨询所做的准备工作（≥50字）</li>
+                <li>• <strong>问题清单：</strong>列出至少1个具体要咨询的问题</li>
                 {formData.professor_replied && (
                   <>
                     <li>• <strong>导师反馈：</strong>记录导师的具体指导内容（≥50字）</li>
@@ -420,7 +420,7 @@ function StudentReportContent() {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     3. 准备工作 <span className="text-red-500">*</span>
-                    <span className="text-gray-500 font-normal ml-2">（≥100字）</span>
+                    <span className="text-gray-500 font-normal ml-2">（≥50字）</span>
                   </label>
                   <textarea
                     value={formData.preparation_work}
@@ -435,9 +435,9 @@ function StudentReportContent() {
                     placeholder="请详细描述你为本次咨询所做的准备工作：包括研读的文献资料、梳理的数据或笔记、撰写的草稿或大纲，以及除查阅外的其他实践环节（如访谈情况、问卷设计、代码调试等），请确保内容详实。"
                   />
                   <div className="mt-1 text-sm text-gray-500">
-                    {formData.preparation_work.trim().length}/100
-                    {formData.preparation_work.trim().length > 0 && formData.preparation_work.trim().length < 100 && (
-                      <span className="text-red-500 ml-2">需至少100字</span>
+                    {formData.preparation_work.trim().length}/50
+                    {formData.preparation_work.trim().length > 0 && formData.preparation_work.trim().length < 50 && (
+                      <span className="text-red-500 ml-2">需至少50字</span>
                     )}
                   </div>
                 </div>
@@ -446,10 +446,10 @@ function StudentReportContent() {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     4. 问题清单 <span className="text-red-500">*</span>
-                    <span className="text-gray-500 font-normal ml-2">（至少2个具体问题）</span>
+                    <span className="text-gray-500 font-normal ml-2">（至少1个具体问题）</span>
                   </label>
                   <div className="space-y-2">
-                    {[0, 1, 2].map((index) => (
+                    {[0, 1].map((index) => (
                       <div key={index}>
                         <label className="block text-xs text-gray-600 mb-1">
                           问题 {index + 1}
@@ -472,9 +472,9 @@ function StudentReportContent() {
                     ))}
                   </div>
                   <div className="mt-1 text-sm text-gray-500">
-                    已填写：{formData.questions.filter(q => q.trim().length > 0).length}/2
-                    {formData.questions.filter(q => q.trim().length > 0).length > 0 && formData.questions.filter(q => q.trim().length > 0).length < 2 && (
-                      <span className="text-red-500 ml-2">需至少2个问题</span>
+                    已填写：{formData.questions.filter(q => q.trim().length > 0).length}/1
+                    {formData.questions.filter(q => q.trim().length > 0).length > 0 && formData.questions.filter(q => q.trim().length > 0).length < 1 && (
+                      <span className="text-red-500 ml-2">需至少1个问题</span>
                     )}
                   </div>
                 </div>

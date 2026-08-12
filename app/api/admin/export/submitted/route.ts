@@ -78,9 +78,8 @@ function generateAdvisorSheets(
       '4.准备工作': report.contacted_professor ? (report.preparation_work || '') : '',
       '5.问题1': (report.contacted_professor && report.question_list) ? (report.question_list.split('\n')[0] || '') : '',
       '6.问题2': (report.contacted_professor && report.question_list) ? (report.question_list.split('\n')[1] || '') : '',
-      '7.问题3': (report.contacted_professor && report.question_list) ? (report.question_list.split('\n')[2] || '') : '',
-      '8.导师反馈': (report.contacted_professor && report.professor_replied) ? (report.advisor_feedback || '') : '',
-      '9.后续计划': (report.contacted_professor && report.professor_replied) ? (report.follow_up_plan || '') : '',
+      '7.导师反馈': (report.contacted_professor && report.professor_replied) ? (report.advisor_feedback || '') : '',
+      '8.后续计划': (report.contacted_professor && report.professor_replied) ? (report.follow_up_plan || '') : '',
     })
   })
 
@@ -204,9 +203,8 @@ export async function GET(request: NextRequest) {
           '4.准备工作': report.contacted_professor ? (report.preparation_work || '') : '',
           '5.问题1': (report.contacted_professor && questions.length > 0) ? (questions[0] || '') : '',
           '6.问题2': (report.contacted_professor && questions.length > 1) ? (questions[1] || '') : '',
-          '7.问题3': (report.contacted_professor && questions.length > 2) ? (questions[2] || '') : '',
-          '8.导师反馈': (report.contacted_professor && report.professor_replied) ? (report.advisor_feedback || '') : '',
-          '9.后续计划': (report.contacted_professor && report.professor_replied) ? (report.follow_up_plan || '') : '',
+          '7.导师反馈': (report.contacted_professor && report.professor_replied) ? (report.advisor_feedback || '') : '',
+          '8.后续计划': (report.contacted_professor && report.professor_replied) ? (report.follow_up_plan || '') : '',
         }
       })
 
@@ -229,12 +227,11 @@ export async function GET(request: NextRequest) {
       { wch: 50 },  // 4.准备工作（加宽）
       { wch: 30 },  // 5.问题1
       { wch: 30 },  // 6.问题2
-      { wch: 30 },  // 7.问题3
-      { wch: 50 },  // 8.导师反馈（加宽）
-      { wch: 30 },  // 9.后续计划
+      { wch: 50 },  // 7.导师反馈（加宽）
+      { wch: 30 },  // 8.后续计划
     ]
 
-    // 为包含文字的列（G列=索引6：2.未咨询原因，I列=索引8：4.准备工作，M列=索引12：8.导师反馈）设置自动换行样式
+    // 为包含文字的列（G列=索引6：2.未咨询原因，I列=索引8：4.准备工作，L列=索引11：7.导师反馈）设置自动换行样式
     if (totalWorksheet['!ref']) {
       const range = XLSX.utils.decode_range(totalWorksheet['!ref'])
       for (let R = range.s.r; R <= range.e.r; ++R) {
@@ -248,10 +245,10 @@ export async function GET(request: NextRequest) {
       if (totalWorksheet[cellAddressI]) {
         totalWorksheet[cellAddressI].s = createWrapCellStyle()
       }
-      // M列（索引12）：8.导师反馈
-      const cellAddressM = XLSX.utils.encode_cell({ r: R, c: 12 })
-      if (totalWorksheet[cellAddressM]) {
-        totalWorksheet[cellAddressM].s = createWrapCellStyle()
+      // L列（索引11）：7.导师反馈
+      const cellAddressL = XLSX.utils.encode_cell({ r: R, c: 11 })
+      if (totalWorksheet[cellAddressL]) {
+        totalWorksheet[cellAddressL].s = createWrapCellStyle()
       }
       }
     }
@@ -285,12 +282,11 @@ export async function GET(request: NextRequest) {
         { wch: 50 },  // 4.准备工作（加宽）
         { wch: 30 },  // 5.问题1
         { wch: 30 },  // 6.问题2
-        { wch: 30 },  // 7.问题3
-        { wch: 50 },  // 8.导师反馈（加宽）
-        { wch: 30 },  // 9.后续计划
+        { wch: 50 },  // 7.导师反馈（加宽）
+        { wch: 30 },  // 8.后续计划
       ]
 
-      // 为包含文字的列（G列=索引6：2.未咨询原因，I列=索引8：4.准备工作，M列=索引12：8.导师反馈）设置自动换行样式
+      // 为包含文字的列（G列=索引6：2.未咨询原因，I列=索引8：4.准备工作，L列=索引11：7.导师反馈）设置自动换行样式
       if (advisorWorksheet['!ref']) {
         const range = XLSX.utils.decode_range(advisorWorksheet['!ref'])
         for (let R = range.s.r; R <= range.e.r; ++R) {
@@ -304,10 +300,10 @@ export async function GET(request: NextRequest) {
         if (advisorWorksheet[cellAddressI]) {
           advisorWorksheet[cellAddressI].s = createWrapCellStyle()
         }
-        // M列（索引12）：8.导师反馈
-        const cellAddressM = XLSX.utils.encode_cell({ r: R, c: 12 })
-        if (advisorWorksheet[cellAddressM]) {
-          advisorWorksheet[cellAddressM].s = createWrapCellStyle()
+        // L列（索引11）：7.导师反馈
+        const cellAddressL = XLSX.utils.encode_cell({ r: R, c: 11 })
+        if (advisorWorksheet[cellAddressL]) {
+          advisorWorksheet[cellAddressL].s = createWrapCellStyle()
         }
         }
       }
