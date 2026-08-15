@@ -14,8 +14,7 @@ export async function POST(request: NextRequest) {
       not_contacted_reason,
       preparation_work,
       question_list,
-      advisor_feedback,
-      follow_up_plan
+      advisor_feedback
     } = body
 
     if (!studentId) {
@@ -57,10 +56,10 @@ export async function POST(request: NextRequest) {
       reply_details: contacted_professor ? reply_details : null,
       signature: signature || null,
       // 结构化字段
-      preparation_work: (contacted_professor && professor_replied) ? preparation_work : null,
-      question_list: (contacted_professor && professor_replied) ? question_list : null,
+      preparation_work: contacted_professor ? preparation_work : null,
+      question_list: contacted_professor ? question_list : null,
       advisor_feedback: (contacted_professor && professor_replied) ? advisor_feedback : null,
-      follow_up_plan: (contacted_professor && professor_replied) ? follow_up_plan : null,
+      follow_up_plan: null,
     }
 
     if (not_contacted_reason !== undefined) {

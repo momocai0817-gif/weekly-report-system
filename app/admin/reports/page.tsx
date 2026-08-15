@@ -24,7 +24,6 @@ interface Report {
   preparation_work?: string | null
   question_list?: string | null
   advisor_feedback?: string | null
-  follow_up_plan?: string | null
 }
 
 export default function AdminReportsPage() {
@@ -78,7 +77,7 @@ export default function AdminReportsPage() {
     if (data.length === 0) return
 
     // Excel数据
-    const headers = ['姓名', '学号', '区队', '导师', '周次', '是否咨询导师', '导师是否回复', '未咨询原因', '准备工作', '问题清单', '导师反馈', '后续计划', '提交时间']
+    const headers = ['姓名', '学号', '区队', '导师', '周次', '是否咨询导师', '导师是否回复', '未咨询原因', '准备工作', '问题清单', '导师反馈', '提交时间']
 
     const rows = data.map(report => [
       report.student.name,
@@ -92,7 +91,6 @@ export default function AdminReportsPage() {
       report.preparation_work || '',
       report.question_list || '',
       report.advisor_feedback || '',
-      report.follow_up_plan || '',
       formatDateTime(report.submitted_at)
     ])
 
@@ -113,7 +111,6 @@ export default function AdminReportsPage() {
       { wch: 40 }, // 准备工作
       { wch: 30 }, // 问题清单
       { wch: 50 }, // 导师反馈
-      { wch: 30 }, // 后续计划
       { wch: 20 }, // 提交时间
     ]
 
@@ -299,7 +296,7 @@ function ReportCard({ report }: { report: Report }) {
             </span>
           </div>
         </div>
-        {(report.contacted_professor || report.not_contacted_reason || report.signature || report.preparation_work || report.question_list || report.advisor_feedback || report.follow_up_plan) && (
+        {(report.contacted_professor || report.not_contacted_reason || report.signature || report.preparation_work || report.question_list || report.advisor_feedback) && (
           <button
             onClick={() => setExpanded(!expanded)}
             className="text-sm text-blue-600 hover:text-blue-800"
@@ -349,14 +346,6 @@ function ReportCard({ report }: { report: Report }) {
               <p className="text-xs text-purple-600 mb-1">导师反馈：</p>
               <p className="text-sm text-gray-800 whitespace-pre-wrap">
                 {report.advisor_feedback}
-              </p>
-            </div>
-          )}
-          {report.follow_up_plan && (
-            <div className="p-3 bg-orange-50 rounded-lg">
-              <p className="text-xs text-orange-600 mb-1">后续计划：</p>
-              <p className="text-sm text-gray-800 whitespace-pre-wrap">
-                {report.follow_up_plan}
               </p>
             </div>
           )}

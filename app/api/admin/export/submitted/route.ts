@@ -79,7 +79,6 @@ function generateAdvisorSheets(
       '5.问题1': (report.contacted_professor && report.question_list) ? (report.question_list.split('\n')[0] || '') : '',
       '6.问题2': (report.contacted_professor && report.question_list) ? (report.question_list.split('\n')[1] || '') : '',
       '7.导师反馈': (report.contacted_professor && report.professor_replied) ? (report.advisor_feedback || '') : '',
-      '8.后续计划': (report.contacted_professor && report.professor_replied) ? (report.follow_up_plan || '') : '',
     })
   })
 
@@ -204,7 +203,6 @@ export async function GET(request: NextRequest) {
           '5.问题1': (report.contacted_professor && questions.length > 0) ? (questions[0] || '') : '',
           '6.问题2': (report.contacted_professor && questions.length > 1) ? (questions[1] || '') : '',
           '7.导师反馈': (report.contacted_professor && report.professor_replied) ? (report.advisor_feedback || '') : '',
-          '8.后续计划': (report.contacted_professor && report.professor_replied) ? (report.follow_up_plan || '') : '',
         }
       })
 
@@ -228,7 +226,6 @@ export async function GET(request: NextRequest) {
       { wch: 30 },  // 5.问题1
       { wch: 30 },  // 6.问题2
       { wch: 50 },  // 7.导师反馈（加宽）
-      { wch: 30 },  // 8.后续计划
     ]
 
     // 为包含文字的列（G列=索引6：2.未咨询原因，I列=索引8：4.准备工作，L列=索引11：7.导师反馈）设置自动换行样式
@@ -283,7 +280,6 @@ export async function GET(request: NextRequest) {
         { wch: 30 },  // 5.问题1
         { wch: 30 },  // 6.问题2
         { wch: 50 },  // 7.导师反馈（加宽）
-        { wch: 30 },  // 8.后续计划
       ]
 
       // 为包含文字的列（G列=索引6：2.未咨询原因，I列=索引8：4.准备工作，L列=索引11：7.导师反馈）设置自动换行样式
