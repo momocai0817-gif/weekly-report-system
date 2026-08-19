@@ -85,6 +85,11 @@ async function generateSubmittedExcel(
     throw new Error(`${squad}该周暂无提交记录`)
   }
 
+  // 按学号排序
+  reports.sort((a: any, b: any) => {
+    return a.student.student_id.localeCompare(b.student.student_id, 'zh-CN', { numeric: true })
+  })
+
   // 按导师分组
   const reportsByAdvisor: Record<string, any[]> = {}
   reports.forEach((report: any) => {
