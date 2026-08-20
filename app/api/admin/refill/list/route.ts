@@ -14,39 +14,17 @@ export async function GET(request: NextRequest) {
 
     let query = supabase
       .from('weekly_reports')
-      .select(`
-        id,
-        student_id,
-        week_number,
-        year,
-        needs_refill,
-        refill_requested_at,
-        refill_reason,
-        refill_resolved_at,
-        refill_resolved_note,
-        submitted_at,
-        contacted_professor,
-        contact_initiator,
-        professor_replied,
-        preparation_work,
-        question_list,
-        advisor_feedback,
-        not_contacted_reason,
-        signature,
-        student:students!inner (
-          name,
-          student_id,
-          squad,
-          advisor
-        )
-      `)
+      .select('*')
       .eq('needs_refill', true)
-      .order('refill_requested_at', { ascending: false })
 
     if (weekParam) query = query.eq('week_number', parseInt(weekParam))
     if (yearParam) query = query.eq('year', parseInt(yearParam))
 
-    const { data: reports, error } = await query
+    const ordered = (query as any).order
+      ? query.order('refill_requested_at', { ascending: false })
+      : query
+
+    const { data: reports, error } = await ordered
 
     if (error) {
       console.error('查询重填列表错误:', error)
@@ -64,15 +42,33 @@ export async function GET(request: NextRequest) {
 
     let filtered = reports || []
     if (activeOnly) {
-      filtered = filtered.filter(r => !r.refill_resolved_at)
+      filtered = filtered.filter((r: any) => !r.refill_resolved_at)
     }
 
+    // 关联学生信息（pg 版不支持嵌套 join，在 Node 端拼接）
+    const studentIds = Array.from(new Set(filtered.map((r: any) => r.student_id)))
+    const studentMap = new Map<string, any>()
+    if (studentIds.length > 0) {
+      const { data: students } = await supabase
+        .from('students')
+        .select('id, name, student_id, squad, advisor')
+        .in('id', studentIds as string[])
+      ;(students || []).forEach((s: any) => {
+        studentMap.set(s.id, s)
+      })
+    }
+
+    const enriched = filtered.map((r: any) => ({
+      ...r,
+      student: studentMap.get(r.student_id) || null,
+    }))
+
     return NextResponse.json({
-      reports: filtered,
+      reports: enriched,
       summary: {
-        total: filtered.length,
-        active: filtered.filter(r => !r.refill_resolved_at).length,
-        resolved: filtered.filter(r => r.refill_resolved_at).length,
+        total: enriched.length,
+        active: enriched.filter((r: any) => !r.refill_resolved_at).length,
+        resolved: enriched.filter((r: any) => r.refill_resolved_at).length,
       },
     })
   } catch (error) {

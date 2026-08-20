@@ -5,7 +5,6 @@ import * as XLSX from 'xlsx'
 function formatDateTime(date: string | null | undefined): string {
   if (!date) return ''
   const d = new Date(date)
-  // 使用北京时间（UTC+8）格式化
   const chinaTime = new Date(d.getTime() + 8 * 60 * 60 * 1000)
   return chinaTime.toLocaleString('zh-CN', {
     year: 'numeric',
@@ -34,23 +33,10 @@ function createWrapCellStyle() {
 
 function styleWorksheet(worksheet: any) {
   worksheet['!cols'] = [
-    { wch: 12 },  // 学号
-    { wch: 10 },  // 姓名
-    { wch: 10 },  // 区队
-    { wch: 10 },  // 导师
-    { wch: 12 },  // 周次
-    { wch: 18 },  // 标记时间
-    { wch: 40 },  // 重填原因
-    { wch: 10 },  // 状态
-    { wch: 10 },  // 联系发起方
-    { wch: 18 },  // 原提交时间
-    { wch: 50 },  // 准备工作
-    { wch: 30 },  // 问题1
-    { wch: 30 },  // 问题2
-    { wch: 50 },  // 导师反馈
-    { wch: 40 },  // 未咨询原因
-    { wch: 18 },  // 重填时间
-    { wch: 40 },  // 学生重填备注
+    { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 10 },
+    { wch: 12 }, { wch: 18 }, { wch: 40 }, { wch: 10 },
+    { wch: 10 }, { wch: 18 }, { wch: 50 }, { wch: 30 },
+    { wch: 30 }, { wch: 50 }, { wch: 40 }, { wch: 18 }, { wch: 40 },
   ]
   if (worksheet['!ref']) {
     const range = XLSX.utils.decode_range(worksheet['!ref'])
@@ -77,25 +63,17 @@ export async function GET(request: NextRequest) {
 
     let query = supabase
       .from('weekly_reports')
-      .select(`
-        *,
-        student:students!inner (
-          id,
-          name,
-          student_id,
-          squad,
-          advisor
-        )
-      `)
+      .select('*')
       .eq('needs_refill', true)
 
     if (week) query = query.eq('week_number', parseInt(week))
     if (year) query = query.eq('year', parseInt(year))
-    if (squad) query = query.eq('student.squad', squad)
 
-    query = query.order('refill_requested_at', { ascending: false })
+    const ordered = (query as any).order
+      ? query.order('refill_requested_at', { ascending: false })
+      : query
 
-    const { data: reports, error } = await query
+    const { data: reports, error } = await ordered
 
     if (error) {
       console.error('查询重填列表错误:', error)
@@ -113,9 +91,28 @@ export async function GET(request: NextRequest) {
 
     let filtered = reports || []
     if (status === 'active') {
-      filtered = filtered.filter(r => !r.refill_resolved_at)
+      filtered = filtered.filter((r: any) => !r.refill_resolved_at)
     } else if (status === 'resolved') {
-      filtered = filtered.filter(r => r.refill_resolved_at)
+      filtered = filtered.filter((r: any) => r.refill_resolved_at)
+    }
+
+    // 关联学生（pg 版不支持嵌套 join，在 Node 端拼接）
+    const studentIds = Array.from(new Set(filtered.map((r: any) => r.student_id)))
+    const studentMap = new Map<string, any>()
+    if (studentIds.length > 0) {
+      const { data: students } = await supabase
+        .from('students')
+        .select('id, name, student_id, squad, advisor')
+        .in('id', studentIds as string[])
+      ;(students || []).forEach((s: any) => studentMap.set(s.id, s))
+    }
+
+    // 按区队过滤（在 Node 端）
+    if (squad) {
+      filtered = filtered.filter((r: any) => {
+        const stu = studentMap.get(r.student_id)
+        return stu && stu.squad === squad
+      })
     }
 
     if (filtered.length === 0) {
@@ -126,20 +123,21 @@ export async function GET(request: NextRequest) {
     }
 
     // 按学号排序
-    filtered.sort((a, b) => {
-      const sa = a.student?.student_id || ''
-      const sb = b.student?.student_id || ''
+    filtered.sort((a: any, b: any) => {
+      const sa = studentMap.get(a.student_id)?.student_id || ''
+      const sb = studentMap.get(b.student_id)?.student_id || ''
       return sa.localeCompare(sb, 'zh-CN', { numeric: true })
     })
 
-    const excelData = filtered.map(r => {
+    const excelData = filtered.map((r: any) => {
+      const stu = studentMap.get(r.student_id)
       const questions = r.question_list ? r.question_list.split('\n') : []
       const statusLabel = !r.refill_resolved_at ? '⏳ 待学生重填' : '✓ 已重填'
       return {
-        '学号': r.student?.student_id || '',
-        '姓名': r.student?.name || '',
-        '区队': r.student?.squad || '',
-        '导师': r.student?.advisor || '',
+        '学号': stu?.student_id || '',
+        '姓名': stu?.name || '',
+        '区队': stu?.squad || '',
+        '导师': stu?.advisor || '',
         '周次': `第${r.week_number}周 (${r.year}年)`,
         '标记时间': formatDateTime(r.refill_requested_at),
         '重填原因': r.refill_reason || '',
@@ -161,22 +159,24 @@ export async function GET(request: NextRequest) {
     styleWorksheet(worksheet)
     XLSX.utils.book_append_sheet(workbook, worksheet, '重填名单')
 
-    // 按状态分 sheet
-    const active = filtered.filter(r => !r.refill_resolved_at)
-    const resolved = filtered.filter(r => r.refill_resolved_at)
+    const active = filtered.filter((r: any) => !r.refill_resolved_at)
+    const resolved = filtered.filter((r: any) => r.refill_resolved_at)
 
     if (active.length > 0) {
       const ws = XLSX.utils.json_to_sheet(
-        active.map(r => ({
-          '学号': r.student?.student_id || '',
-          '姓名': r.student?.name || '',
-          '区队': r.student?.squad || '',
-          '导师': r.student?.advisor || '',
-          '周次': `第${r.week_number}周`,
-          '标记时间': formatDateTime(r.refill_requested_at),
-          '重填原因': r.refill_reason || '',
-          '联系发起方': r.contacted_professor ? getInitiatorLabel(r.contact_initiator) : '',
-        }))
+        active.map((r: any) => {
+          const stu = studentMap.get(r.student_id)
+          return {
+            '学号': stu?.student_id || '',
+            '姓名': stu?.name || '',
+            '区队': stu?.squad || '',
+            '导师': stu?.advisor || '',
+            '周次': `第${r.week_number}周`,
+            '标记时间': formatDateTime(r.refill_requested_at),
+            '重填原因': r.refill_reason || '',
+            '联系发起方': r.contacted_professor ? getInitiatorLabel(r.contact_initiator) : '',
+          }
+        })
       )
       ws['!cols'] = [
         { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 10 },
@@ -187,16 +187,19 @@ export async function GET(request: NextRequest) {
 
     if (resolved.length > 0) {
       const ws = XLSX.utils.json_to_sheet(
-        resolved.map(r => ({
-          '学号': r.student?.student_id || '',
-          '姓名': r.student?.name || '',
-          '区队': r.student?.squad || '',
-          '导师': r.student?.advisor || '',
-          '周次': `第${r.week_number}周`,
-          '标记时间': formatDateTime(r.refill_requested_at),
-          '重填时间': formatDateTime(r.refill_resolved_at),
-          '学生备注': r.refill_resolved_note || '',
-        }))
+        resolved.map((r: any) => {
+          const stu = studentMap.get(r.student_id)
+          return {
+            '学号': stu?.student_id || '',
+            '姓名': stu?.name || '',
+            '区队': stu?.squad || '',
+            '导师': stu?.advisor || '',
+            '周次': `第${r.week_number}周`,
+            '标记时间': formatDateTime(r.refill_requested_at),
+            '重填时间': formatDateTime(r.refill_resolved_at),
+            '学生备注': r.refill_resolved_note || '',
+          }
+        })
       )
       ws['!cols'] = [
         { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 10 },
@@ -206,8 +209,6 @@ export async function GET(request: NextRequest) {
     }
 
     const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx', bookSST: false })
-
-    // 文件名：包含周次信息
     const weekPart = week ? `第${week}周` : '全部'
     const squadPart = squad ? `_${squad}` : ''
     const filename = `重填名单${squadPart}_${weekPart}.xlsx`
