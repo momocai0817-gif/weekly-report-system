@@ -21,16 +21,10 @@ interface Report {
   not_contacted_reason: string | null
   signature: string | null
   submitted_at: string
-  // 新增结构化字段
   preparation_work?: string | null
   question_list?: string | null
   advisor_feedback?: string | null
-  // 重填相关
-  needs_refill?: boolean
-  refill_requested_at?: string | null
-  refill_reason?: string | null
   refill_resolved_at?: string | null
-  refill_resolved_note?: string | null
 }
 
 export default function AdminReportsPage() {
@@ -38,10 +32,6 @@ export default function AdminReportsPage() {
   const [user, setUser] = useState<any>(null)
   const [reports, setReports] = useState<Report[]>([])
   const [loading, setLoading] = useState(true)
-  const [refillModalOpen, setRefillModalOpen] = useState(false)
-  const [refillTarget, setRefillTarget] = useState<Report | null>(null)
-  const [refillReason, setRefillReason] = useState('')
-  const [refillSubmitting, setRefillSubmitting] = useState(false)
 
   const currentWeek = getCurrentWeek()
   const [selectedWeek, setSelectedWeek] = useState(currentWeek.weekNumber)
@@ -83,62 +73,6 @@ export default function AdminReportsPage() {
     router.push('/admin/dashboard')
   }
 
-  const openRefillModal = (report: Report) => {
-    setRefillTarget(report)
-    setRefillReason('')
-    setRefillModalOpen(true)
-  }
-
-  const closeRefillModal = () => {
-    if (refillSubmitting) return
-    setRefillModalOpen(false)
-    setRefillTarget(null)
-    setRefillReason('')
-  }
-
-  const submitRefill = async () => {
-    if (!refillTarget) return
-    setRefillSubmitting(true)
-    try {
-      const response = await fetch('/api/admin/refill', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          reportId: refillTarget.id,
-          reason: refillReason.trim() || null,
-        }),
-      })
-      const data = await response.json()
-      if (!response.ok) {
-        throw new Error(data.error || '标记失败')
-      }
-      alert('已通知学生重新填写')
-      closeRefillModal()
-      fetchReports()
-    } catch (err: any) {
-      alert(err.message || '标记失败')
-    } finally {
-      setRefillSubmitting(false)
-    }
-  }
-
-  const cancelRefill = async (report: Report) => {
-    if (!confirm('确定要撤销该学生的重填标记吗？')) return
-    try {
-      const response = await fetch(
-        `/api/admin/refill?id=${report.id}`,
-        { method: 'DELETE' }
-      )
-      if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error || '撤销失败')
-      }
-      fetchReports()
-    } catch (err: any) {
-      alert(err.message || '撤销失败')
-    }
-  }
-
   // 按区队分组
   const squad1Reports = reports.filter(r => r.student.squad === '一区队')
   const squad2Reports = reports.filter(r => r.student.squad === '二区队')
@@ -153,12 +87,6 @@ export default function AdminReportsPage() {
             <p className="text-sm text-gray-500">查看周报</p>
           </div>
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => router.push('/admin/refill')}
-              className="text-sm px-3 py-1 text-orange-600 hover:text-orange-800 border border-orange-300 rounded hover:bg-orange-50"
-            >
-              🔄 重填管理
-            </button>
             <button
               onClick={handleBack}
               className="text-sm text-gray-600 hover:text-gray-800"
@@ -224,9 +152,9 @@ export default function AdminReportsPage() {
             </button>
             <span className="text-gray-500 ml-4">
               共 {reports.length} 份报告
-              {reports.filter(r => r.needs_refill).length > 0 && (
-                <span className="text-orange-600 ml-2">
-                  · 标记重填 {reports.filter(r => r.needs_refill).length} 人
+              {reports.filter(r => r.refill_resolved_at).length > 0 && (
+                <span className="text-green-600 ml-2">
+                  · 其中重填 {reports.filter(r => r.refill_resolved_at).length} 人
                 </span>
               )}
             </span>
@@ -250,12 +178,7 @@ export default function AdminReportsPage() {
                 </h2>
                 <div className="divide-y">
                   {squad1Reports.map((report) => (
-                    <ReportCard
-                      key={report.id}
-                      report={report}
-                      onMarkRefill={() => openRefillModal(report)}
-                      onCancelRefill={() => cancelRefill(report)}
-                    />
+                    <ReportCard key={report.id} report={report} />
                   ))}
                 </div>
               </div>
@@ -269,94 +192,24 @@ export default function AdminReportsPage() {
                 </h2>
                 <div className="divide-y">
                   {squad2Reports.map((report) => (
-                    <ReportCard
-                      key={report.id}
-                      report={report}
-                      onMarkRefill={() => openRefillModal(report)}
-                      onCancelRefill={() => cancelRefill(report)}
-                    />
+                    <ReportCard key={report.id} report={report} />
                   ))}
                 </div>
               </div>
             )}
           </>
         )}
-
-        {/* 重填标记弹窗 */}
-        {refillModalOpen && refillTarget && (
-          <div
-            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-4"
-            onClick={closeRefillModal}
-          >
-            <div
-              className="bg-white rounded-xl shadow-xl max-w-md w-full p-6"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">
-                🔄 标记学生需重新填写
-              </h3>
-              <div className="mb-4 p-3 bg-gray-50 rounded-lg text-sm">
-                <p className="text-gray-700">
-                  <strong>{refillTarget.student.name}</strong>
-                  <span className="text-gray-500 ml-2">
-                    ({refillTarget.student.student_id})
-                  </span>
-                </p>
-                <p className="text-gray-500 mt-1">
-                  导师：{refillTarget.student.advisor} · {refillTarget.student.squad}
-                </p>
-              </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  重填原因（可选，将展示给学生）
-                </label>
-                <textarea
-                  value={refillReason}
-                  onChange={(e) => setRefillReason(e.target.value)}
-                  rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none resize-none placeholder-gray-500 text-gray-900"
-                  placeholder="例如：经与导师核实，本周并未咨询；或问题清单与实际情况不符……"
-                />
-              </div>
-              <div className="flex gap-2 justify-end">
-                <button
-                  onClick={closeRefillModal}
-                  disabled={refillSubmitting}
-                  className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-50"
-                >
-                  取消
-                </button>
-                <button
-                  onClick={submitRefill}
-                  disabled={refillSubmitting}
-                  className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50"
-                >
-                  {refillSubmitting ? '标记中...' : '确认标记'}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
       </main>
     </div>
   )
 }
 
-function ReportCard({
-  report,
-  onMarkRefill,
-  onCancelRefill,
-}: {
-  report: Report
-  onMarkRefill: () => void
-  onCancelRefill: () => void
-}) {
+function ReportCard({ report }: { report: Report }) {
   const [expanded, setExpanded] = useState(false)
-  const isRefillActive = report.needs_refill && !report.refill_resolved_at
-  const isRefillResolved = report.needs_refill && report.refill_resolved_at
+  const isRefilled = !!report.refill_resolved_at
 
   return (
-    <div className={`p-4 hover:bg-gray-50 ${isRefillActive ? 'bg-orange-50' : ''}`}>
+    <div className={`p-4 hover:bg-gray-50 ${isRefilled ? 'bg-green-50/50' : ''}`}>
       <div className="flex items-start justify-between">
         <div className="flex-1">
           <div className="flex items-center gap-3 flex-wrap">
@@ -367,12 +220,7 @@ function ReportCard({
             <span className="text-sm text-gray-600">
               导师：{report.student.advisor}
             </span>
-            {isRefillActive && (
-              <span className="text-xs text-orange-700 bg-orange-100 px-2 py-0.5 rounded-full">
-                ⚠ 待学生重新填写
-              </span>
-            )}
-            {isRefillResolved && (
+            {isRefilled && (
               <span className="text-xs text-green-700 bg-green-100 px-2 py-0.5 rounded-full">
                 ✓ 已重填
               </span>
@@ -419,12 +267,7 @@ function ReportCard({
             <span className="text-gray-400 text-xs">
               提交于 {formatDateTime(report.submitted_at)}
             </span>
-            {isRefillActive && report.refill_requested_at && (
-              <span className="text-xs text-orange-600">
-                · 标记于 {formatDateTime(report.refill_requested_at)}
-              </span>
-            )}
-            {isRefillResolved && report.refill_resolved_at && (
+            {isRefilled && report.refill_resolved_at && (
               <span className="text-xs text-green-600">
                 · 重填于 {formatDateTime(report.refill_resolved_at)}
               </span>
@@ -432,22 +275,6 @@ function ReportCard({
           </div>
         </div>
         <div className="flex items-center gap-2 ml-4">
-          {isRefillActive ? (
-            <button
-              onClick={onCancelRefill}
-              className="text-xs px-2 py-1 text-orange-700 border border-orange-300 rounded hover:bg-orange-50"
-            >
-              撤销重填
-            </button>
-          ) : (
-            <button
-              onClick={onMarkRefill}
-              className="text-xs px-2 py-1 text-orange-600 border border-orange-300 rounded hover:bg-orange-50"
-              title="与导师核实后发现数据有误时使用"
-            >
-              🔄 标记需重填
-            </button>
-          )}
           {(report.contacted_professor || report.not_contacted_reason || report.signature || report.preparation_work || report.question_list || report.advisor_feedback) && (
             <button
               onClick={() => setExpanded(!expanded)}
@@ -461,22 +288,6 @@ function ReportCard({
 
       {expanded && (
         <div className="mt-3 space-y-3">
-          {isRefillActive && report.refill_reason && (
-            <div className="p-3 bg-orange-100 rounded-lg">
-              <p className="text-xs text-orange-700 mb-1">📌 重填原因（已通知学生）：</p>
-              <p className="text-sm text-orange-800 whitespace-pre-wrap">
-                {report.refill_reason}
-              </p>
-            </div>
-          )}
-          {isRefillResolved && report.refill_resolved_note && (
-            <div className="p-3 bg-green-50 rounded-lg">
-              <p className="text-xs text-green-700 mb-1">✓ 学生重填备注：</p>
-              <p className="text-sm text-green-800 whitespace-pre-wrap">
-                {report.refill_resolved_note}
-              </p>
-            </div>
-          )}
           {report.not_contacted_reason && (
             <div className="p-3 bg-gray-50 rounded-lg">
               <p className="text-xs text-gray-500 mb-1">未咨询原因/所处阶段：</p>
@@ -493,7 +304,6 @@ function ReportCard({
               </p>
             </div>
           )}
-          {/* 结构化字段 */}
           {report.preparation_work && (
             <div className="p-3 bg-blue-50 rounded-lg">
               <p className="text-xs text-blue-600 mb-1">准备工作：</p>

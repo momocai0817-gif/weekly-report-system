@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
       preparation_work,
       question_list,
       advisor_feedback,
-      refill_note,
+      isRefill,
     } = body
 
     if (!studentId) {
@@ -35,17 +35,11 @@ export async function POST(request: NextRequest) {
     // 检查该周是否已存在报告
     const { data: existing } = await supabase
       .from('weekly_reports')
-      .select('id, needs_refill, refill_resolved_at')
+      .select('id')
       .eq('student_id', studentId)
       .eq('week_number', currentWeek.weekNumber)
       .eq('year', currentWeek.year)
       .maybeSingle()
-
-    // 判断是否处于重填状态（学委已标记需要重填，且学生尚未完成重填）
-    const isRefillSubmission =
-      existing &&
-      existing.needs_refill === true &&
-      !existing.refill_resolved_at
 
     if (existing) {
       await supabase
@@ -53,6 +47,9 @@ export async function POST(request: NextRequest) {
         .delete()
         .eq('id', existing.id)
     }
+
+    // 是否通过重填通道（?refill=1）进入
+    const submitAsRefill = isRefill === true
 
     // 构建插入数据对象
     const insertData: any = {
@@ -71,50 +68,25 @@ export async function POST(request: NextRequest) {
       preparation_work: contacted_professor ? preparation_work : null,
       question_list: contacted_professor ? question_list : null,
       advisor_feedback: (contacted_professor && professor_replied) ? advisor_feedback : null,
+      // 历史字段保留为 null
       follow_up_plan: null,
-      // 重填管理：若学生正在响应重填请求，则标记完成
-      needs_refill: isRefillSubmission ? false : false,
-      refill_resolved_at: isRefillSubmission ? new Date().toISOString() : null,
-      refill_resolved_note: isRefillSubmission ? (refill_note || null) : null,
+      needs_refill: false,
+      refill_requested_at: null,
+      refill_reason: null,
+      refill_resolved_note: null,
+      // 通过重填通道进入时，记录重填时间
+      refill_resolved_at: submitAsRefill ? new Date().toISOString() : null,
     }
 
     if (not_contacted_reason !== undefined) {
       insertData.not_contacted_reason = !contacted_professor ? not_contacted_reason : null
     }
 
-    let { data, error } = await supabase
+    const { data, error } = await supabase
       .from('weekly_reports')
       .insert(insertData)
       .select()
       .single()
-
-    if (error && error.message && error.message.includes('not_contacted_reason')) {
-      // 重试不带该字段
-      const { not_contacted_reason: _, ...insertDataRetry } = insertData
-      const result = await supabase
-        .from('weekly_reports')
-        .insert(insertDataRetry)
-        .select()
-        .single()
-      data = result.data
-      error = result.error
-    }
-
-    if (error && error.message && (
-      error.message.includes('contact_initiator') ||
-      error.message.includes('needs_refill')
-    )) {
-      // 兼容未应用新字段迁移的旧库
-      const { not_contacted_reason: _, contact_initiator: _ci, needs_refill: _nr,
-              refill_resolved_at: _ra, refill_resolved_note: _rn, ...insertDataRetry } = insertData
-      const result = await supabase
-        .from('weekly_reports')
-        .insert(insertDataRetry)
-        .select()
-        .single()
-      data = result.data
-      error = result.error
-    }
 
     if (error) {
       console.error('插入错误:', error)
@@ -128,7 +100,7 @@ export async function POST(request: NextRequest) {
       success: true,
       report: data,
       targetWeek: { weekNumber: currentWeek.weekNumber, year: currentWeek.year },
-      is_refill_submission: isRefillSubmission,
+      is_refill_submission: submitAsRefill,
     })
   } catch (error) {
     console.error('提交错误:', error)

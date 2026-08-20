@@ -23,28 +23,20 @@ function StudentReportContent() {
     ? { weekNumber: parseInt(targetWeek), year: parseInt(targetYear) }
     : currentWeek
 
+  // ?refill=1 视作重填通道：学委/老师通知学生走这个 URL 进来提交
+  const isRefillMode = searchParams.get('refill') === '1'
+
   // 表单状态
   const [formData, setFormData] = useState({
     contacted_professor: false,
-    // 新增：联系发起方（仅在咨询时填写）
     contact_initiator: null as 'student' | 'teacher' | null,
     professor_replied: false,
     reply_details: '',
     not_contacted_reason: '',
-    // 结构化字段
     preparation_work: '',
-    questions: ['', ''], // 2个独立的问题输入框
+    questions: ['', ''],
     advisor_feedback: '',
-    // 重填备注（可选）
-    refill_note: '',
   })
-
-  // 是否处于重填模式（学委已标记需要重填）
-  const [isRefillMode, setIsRefillMode] = useState(false)
-  const [refillInfo, setRefillInfo] = useState<{
-    reason: string | null
-    requestedAt: string | null
-  } | null>(null)
 
   // 签名状态
   const [signature, setSignature] = useState('')
@@ -95,24 +87,12 @@ function StudentReportContent() {
           professor_replied: data.report.professor_replied || false,
           reply_details: data.report.reply_details || '',
           not_contacted_reason: data.report.not_contacted_reason || '',
-          // 结构化字段
           preparation_work: data.report.preparation_work || '',
           questions: existingQuestions,
           advisor_feedback: data.report.advisor_feedback || '',
-          refill_note: '',
         })
-        // 加载已有的签名
         if (data.report.signature) {
           setSignature(data.report.signature)
-        }
-
-        // 是否处于重填模式
-        if (data.report.needs_refill && !data.report.refill_resolved_at) {
-          setIsRefillMode(true)
-          setRefillInfo({
-            reason: data.report.refill_reason || null,
-            requestedAt: data.report.refill_requested_at || null,
-          })
         }
       }
     } catch (err) {
@@ -188,7 +168,6 @@ function StudentReportContent() {
     }
 
     try {
-      // 始终使用提交接口，允许覆盖已提交的周报
       const response = await fetch('/api/report/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -197,9 +176,9 @@ function StudentReportContent() {
           weekNumber: currentWeek.weekNumber,
           year: currentWeek.year,
           ...formData,
-          // 将 questions 数组转换为换行分隔的字符串存储
           question_list: formData.questions.filter(q => q.trim()).join('\n'),
           signature,
+          isRefill: isRefillMode,
         }),
       })
 
@@ -212,10 +191,6 @@ function StudentReportContent() {
       setMessage(isRefillMode ? '重填提交成功！感谢你配合重新填写。' : '提交成功！')
 
       setExistingReport(data.report)
-      // 重填成功后清除重填模式
-      setIsRefillMode(false)
-      setRefillInfo(null)
-
       setTimeout(() => setMessage(''), 3000)
     } catch (err: any) {
       setError(err.message)
@@ -237,6 +212,15 @@ function StudentReportContent() {
     )
   }
 
+  const theme = {
+    headerBanner: isRefillMode ? 'bg-orange-50 border-orange-300' : 'bg-blue-50 border-blue-200',
+    headerTitle: isRefillMode ? 'text-orange-800' : 'text-blue-800',
+    headerSub: isRefillMode ? 'text-orange-600' : 'text-blue-600',
+    submitBtn: isRefillMode ? 'bg-orange-600 hover:bg-orange-700' : 'bg-blue-600 hover:bg-blue-700',
+    submitLabel: isRefillMode ? '提交重填' : (existingReport ? '更新周报' : '提交周报'),
+    pageTitle: isRefillMode ? '重填本周周报' : (existingReport ? '修改周报' : '填写本周周报'),
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* 顶部导航 */}
@@ -244,7 +228,9 @@ function StudentReportContent() {
         <div className="max-w-4xl mx-auto px-4 py-4 flex justify-between items-center">
           <div>
             <h1 className="text-xl font-bold text-gray-800">论文指导周报系统</h1>
-            <p className="text-sm text-gray-500">学生端</p>
+            <p className="text-sm text-gray-500">
+              {isRefillMode ? '重填通道' : '学生端'}
+            </p>
           </div>
           <div className="flex items-center gap-4">
             <div className="text-right">
@@ -263,29 +249,26 @@ function StudentReportContent() {
 
       <main className="max-w-2xl mx-auto px-4 py-8">
         {/* 当前周次信息 */}
-        <div className={`border rounded-lg p-4 mb-6 ${
-          isRefillMode
-            ? 'bg-orange-50 border-orange-300'
-            : 'bg-blue-50 border-blue-200'
-        }`}>
+        <div className={`border rounded-lg p-4 mb-6 ${theme.headerBanner}`}>
           <div className="flex justify-between items-center">
             <div>
-              <h2 className={`font-medium ${isRefillMode ? 'text-orange-800' : 'text-blue-800'}`}>
+              <h2 className={`font-medium ${theme.headerTitle}`}>
                 第 {currentWeek.weekNumber} 周 ({currentWeek.year}年)
               </h2>
-              <p className={`text-sm mt-1 ${isRefillMode ? 'text-orange-600' : 'text-blue-600'}`}>
+              <p className={`text-sm mt-1 ${theme.headerSub}`}>
                 导师：{user?.advisor}
               </p>
             </div>
-            {existingReport && !isRefillMode && (
-              <span className="text-sm text-green-600 bg-green-100 px-3 py-1 rounded-full">
-                已提交
-              </span>
-            )}
-            {isRefillMode && (
+            {isRefillMode ? (
               <span className="text-sm text-orange-700 bg-orange-200 px-3 py-1 rounded-full">
-                ⚠ 需重新填写
+                🔄 重填
               </span>
+            ) : (
+              existingReport && (
+                <span className="text-sm text-green-600 bg-green-100 px-3 py-1 rounded-full">
+                  已提交
+                </span>
+              )
             )}
           </div>
           {existingReport && !isRefillMode && (
@@ -294,34 +277,6 @@ function StudentReportContent() {
             </p>
           )}
         </div>
-
-        {/* 重填提示横幅 */}
-        {isRefillMode && (
-          <div className="mb-6 p-4 bg-orange-50 border-l-4 border-orange-500 rounded-r-lg">
-            <div className="flex items-start gap-3">
-              <span className="text-2xl">🔄</span>
-              <div className="flex-1">
-                <h3 className="font-semibold text-orange-800 mb-1">
-                  学委通知你需要重新填写本周周报
-                </h3>
-                <p className="text-sm text-orange-700 leading-relaxed">
-                  经学委与你的导师核实，你本周提交的周报内容与实际情况不符，
-                  请根据真实情况重新填写以下所有信息后再次提交。
-                </p>
-                {refillInfo?.reason && (
-                  <div className="mt-2 p-2 bg-white bg-opacity-60 rounded text-sm text-orange-800">
-                    <strong>学委备注：</strong>{refillInfo.reason}
-                  </div>
-                )}
-                {refillInfo?.requestedAt && (
-                  <p className="mt-2 text-xs text-orange-600">
-                    通知时间：{formatDateTime(refillInfo.requestedAt)}
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* 提示消息 */}
         {message && (
@@ -339,10 +294,7 @@ function StudentReportContent() {
 
         {/* 周报表单 */}
         <div className="bg-white rounded-xl shadow-sm p-6">
-          <h3 className="text-lg font-medium text-gray-800 mb-6">
-            {isRefillMode ? '重新填写本周周报' :
-             existingReport ? '修改周报' : '填写本周周报'}
-          </h3>
+          <h3 className="text-lg font-medium text-gray-800 mb-6">{theme.pageTitle}</h3>
 
           {/* 填写要求 */}
           {formData.contacted_professor && (
@@ -425,17 +377,14 @@ function StudentReportContent() {
               </div>
             )}
 
-            {/* 新增：联系发起方选择 */}
+            {/* 联系发起方选择 */}
             {formData.contacted_professor && (
               <div className="animate-in fade-in slide-in-from-top-2 duration-300">
                 <label className="block text-sm font-medium text-gray-700 mb-3">
                   2. 这次联系，是你主动联系老师，还是老师主动联系的你？
                   <span className="text-red-500">*</span>
                 </label>
-                <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg space-y-3">
-                  <p className="text-xs text-amber-700 leading-relaxed">
-                    💡 请如实选择。这有助于学委准确汇总同学们与导师的沟通情况，避免误报。
-                  </p>
+                <div className="p-4 bg-white border border-gray-200 rounded-lg space-y-3">
                   <div className="flex flex-col sm:flex-row gap-3">
                     <label className={`flex-1 flex items-center gap-2 p-3 rounded-lg border cursor-pointer transition ${
                       formData.contact_initiator === 'student'
@@ -496,7 +445,7 @@ function StudentReportContent() {
               </div>
             )}
 
-            {/* 问题3（原2）：老师是否回复 */}
+            {/* 问题3：老师是否回复 */}
             {formData.contacted_professor && (
               <div className="animate-in fade-in slide-in-from-top-2 duration-300">
                 <label className="block text-sm font-medium text-gray-700 mb-3">
@@ -610,7 +559,6 @@ function StudentReportContent() {
             {/* 导师反馈 - 仅当咨询过且导师回复时显示 */}
             {formData.contacted_professor && formData.professor_replied && (
               <div className="space-y-6 animate-in fade-in slide-in-from-top-2 duration-300">
-                {/* 导师反馈 */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     6. 导师反馈 <span className="text-red-500">*</span>
@@ -638,27 +586,6 @@ function StudentReportContent() {
               </div>
             )}
 
-            {/* 重填时的备注（可选） */}
-            {isRefillMode && (
-              <div className="animate-in fade-in slide-in-from-top-2 duration-300">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  补充说明 <span className="text-gray-400 font-normal">（可选）</span>
-                </label>
-                <textarea
-                  value={formData.refill_note}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      refill_note: e.target.value,
-                    })
-                  }
-                  rows={2}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none resize-none placeholder-gray-500 text-gray-900"
-                  placeholder="如有需要说明的情况，可在此补充，例如上次填写错误的原因..."
-                />
-              </div>
-            )}
-
             {/* 签名区域 */}
             <div className="border-t pt-6">
               <label className="block text-sm font-medium text-gray-700 mb-3">
@@ -680,19 +607,9 @@ function StudentReportContent() {
               <button
                 type="submit"
                 disabled={submitting}
-                className={`flex-1 text-white py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition ${
-                  isRefillMode
-                    ? 'bg-orange-600 hover:bg-orange-700'
-                    : 'bg-blue-600 hover:bg-blue-700'
-                }`}
+                className={`flex-1 text-white py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition ${theme.submitBtn}`}
               >
-                {submitting
-                  ? '提交中...'
-                  : isRefillMode
-                    ? '提交重填'
-                    : existingReport
-                      ? '更新周报'
-                      : '提交周报'}
+                {submitting ? '提交中...' : theme.submitLabel}
               </button>
             </div>
           </form>

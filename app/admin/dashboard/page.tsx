@@ -499,11 +499,11 @@ export default function AdminDashboardPage() {
 
           <button
             onClick={() => router.push('/admin/refill')}
-            className="bg-white rounded-xl shadow-sm p-4 text-left hover:shadow-md transition border-2 border-orange-200"
+            className="bg-white rounded-xl shadow-sm p-4 text-left hover:shadow-md transition border-2 border-green-200"
           >
             <div className="text-2xl mb-2">🔄</div>
-            <h4 className="font-medium text-gray-800">重填管理</h4>
-            <p className="text-sm text-gray-500">数据有误时通知学生重填</p>
+            <h4 className="font-medium text-gray-800">重填名单</h4>
+            <p className="text-sm text-gray-500">查看与导出已重填的学生</p>
           </button>
 
           <button
