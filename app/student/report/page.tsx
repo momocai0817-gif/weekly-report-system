@@ -26,6 +26,8 @@ function StudentReportContent() {
   // 表单状态
   const [formData, setFormData] = useState({
     contacted_professor: false,
+    // 新增：联系发起方（仅在咨询时填写）
+    contact_initiator: null as 'student' | 'teacher' | null,
     professor_replied: false,
     reply_details: '',
     not_contacted_reason: '',
@@ -33,7 +35,16 @@ function StudentReportContent() {
     preparation_work: '',
     questions: ['', ''], // 2个独立的问题输入框
     advisor_feedback: '',
+    // 重填备注（可选）
+    refill_note: '',
   })
+
+  // 是否处于重填模式（学委已标记需要重填）
+  const [isRefillMode, setIsRefillMode] = useState(false)
+  const [refillInfo, setRefillInfo] = useState<{
+    reason: string | null
+    requestedAt: string | null
+  } | null>(null)
 
   // 签名状态
   const [signature, setSignature] = useState('')
@@ -80,6 +91,7 @@ function StudentReportContent() {
 
         setFormData({
           contacted_professor: data.report.contacted_professor,
+          contact_initiator: data.report.contact_initiator || null,
           professor_replied: data.report.professor_replied || false,
           reply_details: data.report.reply_details || '',
           not_contacted_reason: data.report.not_contacted_reason || '',
@@ -87,10 +99,20 @@ function StudentReportContent() {
           preparation_work: data.report.preparation_work || '',
           questions: existingQuestions,
           advisor_feedback: data.report.advisor_feedback || '',
+          refill_note: '',
         })
         // 加载已有的签名
         if (data.report.signature) {
           setSignature(data.report.signature)
+        }
+
+        // 是否处于重填模式
+        if (data.report.needs_refill && !data.report.refill_resolved_at) {
+          setIsRefillMode(true)
+          setRefillInfo({
+            reason: data.report.refill_reason || null,
+            requestedAt: data.report.refill_requested_at || null,
+          })
         }
       }
     } catch (err) {
@@ -109,6 +131,13 @@ function StudentReportContent() {
     // 验证：第一题选"否"时必须填写原因
     if (!formData.contacted_professor && !formData.not_contacted_reason.trim()) {
       setError('请填写未咨询导师的原因或现处阶段')
+      setSubmitting(false)
+      return
+    }
+
+    // 验证：咨询时必须选择联系发起方
+    if (formData.contacted_professor && !formData.contact_initiator) {
+      setError('请选择：是你主动联系老师，还是老师主动联系的你？')
       setSubmitting(false)
       return
     }
@@ -180,9 +209,12 @@ function StudentReportContent() {
         throw new Error(data.error || '提交失败')
       }
 
-      setMessage('提交成功！')
+      setMessage(isRefillMode ? '重填提交成功！感谢你配合重新填写。' : '提交成功！')
 
       setExistingReport(data.report)
+      // 重填成功后清除重填模式
+      setIsRefillMode(false)
+      setRefillInfo(null)
 
       setTimeout(() => setMessage(''), 3000)
     } catch (err: any) {
@@ -231,28 +263,65 @@ function StudentReportContent() {
 
       <main className="max-w-2xl mx-auto px-4 py-8">
         {/* 当前周次信息 */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+        <div className={`border rounded-lg p-4 mb-6 ${
+          isRefillMode
+            ? 'bg-orange-50 border-orange-300'
+            : 'bg-blue-50 border-blue-200'
+        }`}>
           <div className="flex justify-between items-center">
             <div>
-              <h2 className="font-medium text-blue-800">
+              <h2 className={`font-medium ${isRefillMode ? 'text-orange-800' : 'text-blue-800'}`}>
                 第 {currentWeek.weekNumber} 周 ({currentWeek.year}年)
               </h2>
-              <p className="text-sm text-blue-600 mt-1">
+              <p className={`text-sm mt-1 ${isRefillMode ? 'text-orange-600' : 'text-blue-600'}`}>
                 导师：{user?.advisor}
               </p>
             </div>
-            {existingReport && (
+            {existingReport && !isRefillMode && (
               <span className="text-sm text-green-600 bg-green-100 px-3 py-1 rounded-full">
                 已提交
               </span>
             )}
+            {isRefillMode && (
+              <span className="text-sm text-orange-700 bg-orange-200 px-3 py-1 rounded-full">
+                ⚠ 需重新填写
+              </span>
+            )}
           </div>
-          {existingReport && (
+          {existingReport && !isRefillMode && (
             <p className="text-xs text-gray-500 mt-2">
               提交时间：{formatDateTime(existingReport.submitted_at)}
             </p>
           )}
         </div>
+
+        {/* 重填提示横幅 */}
+        {isRefillMode && (
+          <div className="mb-6 p-4 bg-orange-50 border-l-4 border-orange-500 rounded-r-lg">
+            <div className="flex items-start gap-3">
+              <span className="text-2xl">🔄</span>
+              <div className="flex-1">
+                <h3 className="font-semibold text-orange-800 mb-1">
+                  学委通知你需要重新填写本周周报
+                </h3>
+                <p className="text-sm text-orange-700 leading-relaxed">
+                  经学委与你的导师核实，你本周提交的周报内容与实际情况不符，
+                  请根据真实情况重新填写以下所有信息后再次提交。
+                </p>
+                {refillInfo?.reason && (
+                  <div className="mt-2 p-2 bg-white bg-opacity-60 rounded text-sm text-orange-800">
+                    <strong>学委备注：</strong>{refillInfo.reason}
+                  </div>
+                )}
+                {refillInfo?.requestedAt && (
+                  <p className="mt-2 text-xs text-orange-600">
+                    通知时间：{formatDateTime(refillInfo.requestedAt)}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* 提示消息 */}
         {message && (
@@ -271,7 +340,8 @@ function StudentReportContent() {
         {/* 周报表单 */}
         <div className="bg-white rounded-xl shadow-sm p-6">
           <h3 className="text-lg font-medium text-gray-800 mb-6">
-            {existingReport ? '修改周报' : '填写本周周报'}
+            {isRefillMode ? '重新填写本周周报' :
+             existingReport ? '修改周报' : '填写本周周报'}
           </h3>
 
           {/* 填写要求 */}
@@ -279,6 +349,7 @@ function StudentReportContent() {
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
               <h4 className="font-medium text-blue-800 mb-2">📝 填写要求</h4>
               <ul className="text-sm text-blue-700 space-y-1">
+                <li>• <strong>联系发起方：</strong>请如实选择是你主动联系还是老师主动联系</li>
                 <li>• <strong>准备工作：</strong>详细描述你为本次咨询所做的准备工作（≥30字）</li>
                 <li>• <strong>问题清单：</strong>列出至少1个本周已向导师咨询过的具体问题</li>
                 {formData.professor_replied && (
@@ -321,6 +392,7 @@ function StudentReportContent() {
                       setFormData({
                         ...formData,
                         contacted_professor: false,
+                        contact_initiator: null,
                         professor_replied: false,
                         reply_details: '',
                       })
@@ -353,11 +425,82 @@ function StudentReportContent() {
               </div>
             )}
 
-            {/* 问题2：老师是否回复 */}
+            {/* 新增：联系发起方选择 */}
             {formData.contacted_professor && (
               <div className="animate-in fade-in slide-in-from-top-2 duration-300">
                 <label className="block text-sm font-medium text-gray-700 mb-3">
-                  2. 导师是否回复？
+                  2. 这次联系，是你主动联系老师，还是老师主动联系的你？
+                  <span className="text-red-500">*</span>
+                </label>
+                <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg space-y-3">
+                  <p className="text-xs text-amber-700 leading-relaxed">
+                    💡 请如实选择。这有助于学委准确汇总同学们与导师的沟通情况，避免误报。
+                  </p>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <label className={`flex-1 flex items-center gap-2 p-3 rounded-lg border cursor-pointer transition ${
+                      formData.contact_initiator === 'student'
+                        ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200'
+                        : 'border-gray-200 hover:border-blue-300 bg-white'
+                    }`}>
+                      <input
+                        type="radio"
+                        name="contact_initiator"
+                        value="student"
+                        checked={formData.contact_initiator === 'student'}
+                        onChange={() =>
+                          setFormData({
+                            ...formData,
+                            contact_initiator: 'student',
+                          })
+                        }
+                        className="mr-1"
+                      />
+                      <div>
+                        <div className="text-sm font-medium text-gray-800">
+                          我主动联系老师
+                        </div>
+                        <div className="text-xs text-gray-500 mt-0.5">
+                          本周由我发起，向导师请教问题
+                        </div>
+                      </div>
+                    </label>
+                    <label className={`flex-1 flex items-center gap-2 p-3 rounded-lg border cursor-pointer transition ${
+                      formData.contact_initiator === 'teacher'
+                        ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200'
+                        : 'border-gray-200 hover:border-blue-300 bg-white'
+                    }`}>
+                      <input
+                        type="radio"
+                        name="contact_initiator"
+                        value="teacher"
+                        checked={formData.contact_initiator === 'teacher'}
+                        onChange={() =>
+                          setFormData({
+                            ...formData,
+                            contact_initiator: 'teacher',
+                          })
+                        }
+                        className="mr-1"
+                      />
+                      <div>
+                        <div className="text-sm font-medium text-gray-800">
+                          老师主动联系我
+                        </div>
+                        <div className="text-xs text-gray-500 mt-0.5">
+                          本周由导师主动找我沟通指导
+                        </div>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 问题3（原2）：老师是否回复 */}
+            {formData.contacted_professor && (
+              <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                <label className="block text-sm font-medium text-gray-700 mb-3">
+                  3. 导师是否回复？
                 </label>
                 <div className="flex gap-4">
                   <label className="flex items-center">
@@ -402,7 +545,7 @@ function StudentReportContent() {
                 {/* 准备工作 */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    3. 准备工作 <span className="text-red-500">*</span>
+                    4. 准备工作 <span className="text-red-500">*</span>
                     <span className="text-gray-500 font-normal ml-2">（≥30字）</span>
                   </label>
                   <textarea
@@ -428,7 +571,7 @@ function StudentReportContent() {
                 {/* 问题清单 */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    4. 问题清单 <span className="text-red-500">*</span>
+                    5. 问题清单 <span className="text-red-500">*</span>
                     <span className="text-gray-500 font-normal ml-2">（本周已咨询过的至少1个具体问题）</span>
                   </label>
                   <div className="space-y-2">
@@ -470,7 +613,7 @@ function StudentReportContent() {
                 {/* 导师反馈 */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    5. 导师反馈 <span className="text-red-500">*</span>
+                    6. 导师反馈 <span className="text-red-500">*</span>
                     <span className="text-gray-500 font-normal ml-2">（≥30字）</span>
                   </label>
                   <textarea
@@ -495,11 +638,35 @@ function StudentReportContent() {
               </div>
             )}
 
+            {/* 重填时的备注（可选） */}
+            {isRefillMode && (
+              <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  补充说明 <span className="text-gray-400 font-normal">（可选）</span>
+                </label>
+                <textarea
+                  value={formData.refill_note}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      refill_note: e.target.value,
+                    })
+                  }
+                  rows={2}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none resize-none placeholder-gray-500 text-gray-900"
+                  placeholder="如有需要说明的情况，可在此补充，例如上次填写错误的原因..."
+                />
+              </div>
+            )}
+
             {/* 签名区域 */}
             <div className="border-t pt-6">
               <label className="block text-sm font-medium text-gray-700 mb-3">
-                {!formData.contacted_professor ? '3. 学生签名' :
-                 !formData.professor_replied ? '5. 学生签名' : '6. 学生签名'} <span className="text-red-500">*</span>
+                {(() => {
+                  if (!formData.contacted_professor) return '3. 学生签名'
+                  if (!formData.professor_replied) return '6. 学生签名'
+                  return '7. 学生签名'
+                })()} <span className="text-red-500">*</span>
               </label>
               <SignatureCanvas
                 value={signature}
@@ -513,9 +680,19 @@ function StudentReportContent() {
               <button
                 type="submit"
                 disabled={submitting}
-                className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                className={`flex-1 text-white py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition ${
+                  isRefillMode
+                    ? 'bg-orange-600 hover:bg-orange-700'
+                    : 'bg-blue-600 hover:bg-blue-700'
+                }`}
               >
-                {submitting ? '提交中...' : existingReport ? '更新周报' : '提交周报'}
+                {submitting
+                  ? '提交中...'
+                  : isRefillMode
+                    ? '提交重填'
+                    : existingReport
+                      ? '更新周报'
+                      : '提交周报'}
               </button>
             </div>
           </form>

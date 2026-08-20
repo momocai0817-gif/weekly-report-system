@@ -50,7 +50,36 @@ function createWrapCellStyle() {
   }
 }
 
-// 按导师分组生成数据
+// 联系发起方转中文
+function getInitiatorLabel(initiator: string | null | undefined): string {
+  if (initiator === 'student') return '学生主动'
+  if (initiator === 'teacher') return '老师主动'
+  return ''
+}
+
+// 将单条报告转成基础行（不含分组信息）
+function reportToRow(report: any, student: any) {
+  const questions = report.question_list ? report.question_list.split('\n') : []
+  return {
+    '学号': student?.student_id || '',
+    '姓名': student?.name || '',
+    '区队': student?.squad || '',
+    '导师': student?.advisor || '',
+    '提交时间': formatDateTime(report.submitted_at),
+    '1.本周是否咨询过导师问题？': report.contacted_professor ? '是' : '否',
+    '2.联系发起方': report.contacted_professor
+      ? getInitiatorLabel(report.contact_initiator)
+      : '',
+    '3.未咨询原因/所处阶段': !report.contacted_professor ? (report.not_contacted_reason || '') : '',
+    '4.导师是否回复？': report.contacted_professor ? (report.professor_replied ? '是' : '否') : '',
+    '5.准备工作': report.contacted_professor ? (report.preparation_work || '') : '',
+    '6.问题1': (report.contacted_professor && questions.length > 0) ? (questions[0] || '') : '',
+    '7.问题2': (report.contacted_professor && questions.length > 1) ? (questions[1] || '') : '',
+    '8.导师反馈': (report.contacted_professor && report.professor_replied) ? (report.advisor_feedback || '') : '',
+  }
+}
+
+// 按联系发起方分组 + 导师分组
 function generateAdvisorSheets(
   reports: any[],
   studentMap: Map<string, any>
@@ -66,23 +95,49 @@ function generateAdvisorSheets(
       advisorGroups.set(advisor, [])
     }
 
-    advisorGroups.get(advisor)!.push({
-      '学号': student.student_id,
-      '姓名': student.name,
-      '区队': student.squad,
-      '导师': advisor,
-      '提交时间': formatDateTime(report.submitted_at),
-      '1.本周是否咨询过导师问题？': report.contacted_professor ? '是' : '否',
-      '2.未咨询原因/所处阶段': !report.contacted_professor ? (report.not_contacted_reason || '') : '',
-      '3.导师是否回复？': report.contacted_professor ? (report.professor_replied ? '是' : '否') : '',
-      '4.准备工作': report.contacted_professor ? (report.preparation_work || '') : '',
-      '5.问题1': (report.contacted_professor && report.question_list) ? (report.question_list.split('\n')[0] || '') : '',
-      '6.问题2': (report.contacted_professor && report.question_list) ? (report.question_list.split('\n')[1] || '') : '',
-      '7.导师反馈': (report.contacted_professor && report.professor_replied) ? (report.advisor_feedback || '') : '',
-    })
+    advisorGroups.get(advisor)!.push(reportToRow(report, student))
   })
 
   return advisorGroups
+}
+
+// 设置列宽 + 自动换行
+function styleWorksheet(worksheet: any) {
+  worksheet['!cols'] = [
+    { wch: 12 },  // 学号
+    { wch: 10 },  // 姓名
+    { wch: 10 },  // 区队
+    { wch: 10 },  // 导师
+    { wch: 18 },  // 提交时间
+    { wch: 10 },  // 1.本周是否咨询过导师问题？
+    { wch: 12 },  // 2.联系发起方
+    { wch: 40 },  // 3.未咨询原因/所处阶段
+    { wch: 8 },   // 4.导师是否回复？
+    { wch: 50 },  // 5.准备工作
+    { wch: 30 },  // 6.问题1
+    { wch: 30 },  // 7.问题2
+    { wch: 50 },  // 8.导师反馈
+  ]
+
+  if (worksheet['!ref']) {
+    const range = XLSX.utils.decode_range(worksheet['!ref'])
+    for (let R = range.s.r; R <= range.e.r; ++R) {
+      // H列（索引7）：3.未咨询原因
+      const cellH = XLSX.utils.encode_cell({ r: R, c: 7 })
+      if (worksheet[cellH]) worksheet[cellH].s = createWrapCellStyle()
+      // J列（索引9）：5.准备工作
+      const cellJ = XLSX.utils.encode_cell({ r: R, c: 9 })
+      if (worksheet[cellJ]) worksheet[cellJ].s = createWrapCellStyle()
+      // M列（索引12）：8.导师反馈
+      const cellM = XLSX.utils.encode_cell({ r: R, c: 12 })
+      if (worksheet[cellM]) worksheet[cellM].s = createWrapCellStyle()
+    }
+  }
+}
+
+// 安全截断 sheet 名（Excel 限制 31 字符）
+function safeSheetName(name: string): string {
+  return name.length > 28 ? name.substring(0, 28) : name
 }
 
 export async function GET(request: NextRequest) {
@@ -176,135 +231,63 @@ export async function GET(request: NextRequest) {
       students.map(s => [s.id, s])
     )
 
-    // 生成Excel数据
-    const excelData = reports
-      .filter(report => {
-        const student = studentMap.get(report.student_id)
-        return student && (!squad || student.squad === squad)
-      })
-      .sort((a, b) => {
-        const studentA = studentMap.get(a.student_id)
-        const studentB = studentMap.get(b.student_id)
-        return (studentA?.student_id || '').localeCompare(studentB?.student_id || '', 'zh-CN', { numeric: true })
-      })
-      .map(report => {
-        const student = studentMap.get(report.student_id)
-        const questions = report.question_list ? report.question_list.split('\n') : []
-        return {
-          '学号': student?.student_id || '',
-          '姓名': student?.name || '',
-          '区队': student?.squad || '',
-          '导师': student?.advisor || '',
-          '提交时间': formatDateTime(report.submitted_at),
-          '1.本周是否咨询过导师问题？': report.contacted_professor ? '是' : '否',
-          '2.未咨询原因/所处阶段': !report.contacted_professor ? (report.not_contacted_reason || '') : '',
-          '3.导师是否回复？': report.contacted_professor ? (report.professor_replied ? '是' : '否') : '',
-          '4.准备工作': report.contacted_professor ? (report.preparation_work || '') : '',
-          '5.问题1': (report.contacted_professor && questions.length > 0) ? (questions[0] || '') : '',
-          '6.问题2': (report.contacted_professor && questions.length > 1) ? (questions[1] || '') : '',
-          '7.导师反馈': (report.contacted_professor && report.professor_replied) ? (report.advisor_feedback || '') : '',
-        }
-      })
+    // 过滤 + 排序 + 转行
+    const filteredReports = reports.filter(report => {
+      const student = studentMap.get(report.student_id)
+      return student && (!squad || student.squad === squad)
+    }).sort((a, b) => {
+      const studentA = studentMap.get(a.student_id)
+      const studentB = studentMap.get(b.student_id)
+      return (studentA?.student_id || '').localeCompare(studentB?.student_id || '', 'zh-CN', { numeric: true })
+    })
 
-    // 创建Excel工作簿
+    // ===== Sheet 1: 总表 =====
+    const excelData = filteredReports.map(report => reportToRow(report, studentMap.get(report.student_id)))
+
     const workbook = XLSX.utils.book_new()
-
-    // 添加总表（第一个sheet）
     const totalWorksheet = XLSX.utils.json_to_sheet(excelData)
-
-    // 设置列宽
-    totalWorksheet['!cols'] = [
-      { wch: 12 },  // 学号
-      { wch: 10 },  // 姓名
-      { wch: 10 },  // 区队
-      { wch: 10 },  // 导师
-      { wch: 18 },  // 提交时间
-      { wch: 10 },  // 1.本周是否咨询过导师问题？
-      { wch: 40 },  // 2.未咨询原因/所处阶段（加宽以显示更多文字）
-      { wch: 8 },   // 3.导师是否回复？
-      { wch: 50 },  // 4.准备工作（加宽）
-      { wch: 30 },  // 5.问题1
-      { wch: 30 },  // 6.问题2
-      { wch: 50 },  // 7.导师反馈（加宽）
-    ]
-
-    // 为包含文字的列（G列=索引6：2.未咨询原因，I列=索引8：4.准备工作，L列=索引11：7.导师反馈）设置自动换行样式
-    if (totalWorksheet['!ref']) {
-      const range = XLSX.utils.decode_range(totalWorksheet['!ref'])
-      for (let R = range.s.r; R <= range.e.r; ++R) {
-      // G列（索引6）：2.未咨询原因/所处阶段
-      const cellAddressG = XLSX.utils.encode_cell({ r: R, c: 6 })
-      if (totalWorksheet[cellAddressG]) {
-        totalWorksheet[cellAddressG].s = createWrapCellStyle()
-      }
-      // I列（索引8）：4.准备工作
-      const cellAddressI = XLSX.utils.encode_cell({ r: R, c: 8 })
-      if (totalWorksheet[cellAddressI]) {
-        totalWorksheet[cellAddressI].s = createWrapCellStyle()
-      }
-      // L列（索引11）：7.导师反馈
-      const cellAddressL = XLSX.utils.encode_cell({ r: R, c: 11 })
-      if (totalWorksheet[cellAddressL]) {
-        totalWorksheet[cellAddressL].s = createWrapCellStyle()
-      }
-      }
-    }
-
+    styleWorksheet(totalWorksheet)
     XLSX.utils.book_append_sheet(workbook, totalWorksheet, '总表')
 
-    // 添加按导师分组的sheet（无论是否有区队过滤）
-    const advisorGroups = generateAdvisorSheets(reports, studentMap)
+    // ===== Sheet 2: 按联系发起方分组 =====
+    const contactedReports = filteredReports.filter(r => r.contacted_professor)
+    const studentInitiated = contactedReports.filter(r => r.contact_initiator === 'student')
+    const teacherInitiated = contactedReports.filter(r => r.contact_initiator === 'teacher')
+    const noInitiator = contactedReports.filter(r => !r.contact_initiator) // 历史数据兼容
 
-    // 按导师名字排序
+    if (studentInitiated.length > 0) {
+      const ws = XLSX.utils.json_to_sheet(
+        studentInitiated.map(r => reportToRow(r, studentMap.get(r.student_id)))
+      )
+      styleWorksheet(ws)
+      XLSX.utils.book_append_sheet(workbook, ws, '学生主动联系')
+    }
+    if (teacherInitiated.length > 0) {
+      const ws = XLSX.utils.json_to_sheet(
+        teacherInitiated.map(r => reportToRow(r, studentMap.get(r.student_id)))
+      )
+      styleWorksheet(ws)
+      XLSX.utils.book_append_sheet(workbook, ws, '老师主动联系')
+    }
+    if (noInitiator.length > 0) {
+      const ws = XLSX.utils.json_to_sheet(
+        noInitiator.map(r => reportToRow(r, studentMap.get(r.student_id)))
+      )
+      styleWorksheet(ws)
+      XLSX.utils.book_append_sheet(workbook, ws, '未注明(历史)')
+    }
+
+    // ===== Sheet 3-N: 按导师分组 =====
+    const advisorGroups = generateAdvisorSheets(filteredReports, studentMap)
     const sortedAdvisors = Array.from(advisorGroups.keys()).sort((a, b) =>
       a.localeCompare(b, 'zh-CN')
     )
 
     sortedAdvisors.forEach((advisor) => {
       const advisorData = advisorGroups.get(advisor)!
-      // sheet名称不能超过31个字符
-      const sheetName = advisor.length > 28 ? advisor.substring(0, 28) : advisor
       const advisorWorksheet = XLSX.utils.json_to_sheet(advisorData)
-
-      // 设置列宽
-      advisorWorksheet['!cols'] = [
-        { wch: 12 },  // 学号
-        { wch: 10 },  // 姓名
-        { wch: 10 },  // 区队
-        { wch: 10 },  // 导师
-        { wch: 18 },  // 提交时间
-        { wch: 10 },  // 1.本周是否咨询过导师问题？
-        { wch: 40 },  // 2.未咨询原因/所处阶段（加宽以显示更多文字）
-        { wch: 8 },   // 3.导师是否回复？
-        { wch: 50 },  // 4.准备工作（加宽）
-        { wch: 30 },  // 5.问题1
-        { wch: 30 },  // 6.问题2
-        { wch: 50 },  // 7.导师反馈（加宽）
-      ]
-
-      // 为包含文字的列（G列=索引6：2.未咨询原因，I列=索引8：4.准备工作，L列=索引11：7.导师反馈）设置自动换行样式
-      if (advisorWorksheet['!ref']) {
-        const range = XLSX.utils.decode_range(advisorWorksheet['!ref'])
-        for (let R = range.s.r; R <= range.e.r; ++R) {
-        // G列（索引6）：2.未咨询原因/所处阶段
-        const cellAddressG = XLSX.utils.encode_cell({ r: R, c: 6 })
-        if (advisorWorksheet[cellAddressG]) {
-          advisorWorksheet[cellAddressG].s = createWrapCellStyle()
-        }
-        // I列（索引8）：4.准备工作
-        const cellAddressI = XLSX.utils.encode_cell({ r: R, c: 8 })
-        if (advisorWorksheet[cellAddressI]) {
-          advisorWorksheet[cellAddressI].s = createWrapCellStyle()
-        }
-        // L列（索引11）：7.导师反馈
-        const cellAddressL = XLSX.utils.encode_cell({ r: R, c: 11 })
-        if (advisorWorksheet[cellAddressL]) {
-          advisorWorksheet[cellAddressL].s = createWrapCellStyle()
-        }
-        }
-      }
-
-      XLSX.utils.book_append_sheet(workbook, advisorWorksheet, sheetName)
+      styleWorksheet(advisorWorksheet)
+      XLSX.utils.book_append_sheet(workbook, advisorWorksheet, safeSheetName(advisor))
     })
 
     // 生成Excel文件

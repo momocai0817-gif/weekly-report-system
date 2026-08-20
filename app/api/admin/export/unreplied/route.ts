@@ -39,6 +39,11 @@ export async function GET(request: NextRequest) {
       '导师': item.student.advisor,
       '问题周次': `第${item.previousWeek}周-第${item.currentWeek}周`,
       '年份': `${item.previousYear}-${item.currentYear}`,
+      '联系发起方': item.contact_initiator === 'student'
+        ? '学生主动'
+        : item.contact_initiator === 'teacher'
+          ? '老师主动'
+          : '未注明',
       '情况说明': '连续两周学生咨询导师但导师未回复',
     }))
 
@@ -55,6 +60,11 @@ export async function GET(request: NextRequest) {
         '区队': item.student.squad,
         '导师': advisor,
         '问题周次': `第${item.previousWeek}周-第${item.currentWeek}周`,
+        '联系发起方': item.contact_initiator === 'student'
+          ? '学生主动'
+          : item.contact_initiator === 'teacher'
+            ? '老师主动'
+            : '未注明',
       })
     })
 

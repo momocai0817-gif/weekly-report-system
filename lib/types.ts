@@ -39,6 +39,14 @@ export interface Database {
           reply_details: string | null
           screenshot_urls: string[] | null
           submitted_at: string
+          // 联系发起方：student=学生主动联系老师 / teacher=老师主动联系学生
+          contact_initiator: 'student' | 'teacher' | null
+          // 重填管理
+          needs_refill: boolean
+          refill_requested_at: string | null
+          refill_reason: string | null
+          refill_resolved_at: string | null
+          refill_resolved_note: string | null
         }
         Insert: {
           id?: string
@@ -50,6 +58,12 @@ export interface Database {
           reply_details?: string | null
           screenshot_urls?: string[] | null
           submitted_at?: string
+          contact_initiator?: 'student' | 'teacher' | null
+          needs_refill?: boolean
+          refill_requested_at?: string | null
+          refill_reason?: string | null
+          refill_resolved_at?: string | null
+          refill_resolved_note?: string | null
         }
         Update: {
           id?: string
@@ -61,6 +75,12 @@ export interface Database {
           reply_details?: string | null
           screenshot_urls?: string[] | null
           submitted_at?: string
+          contact_initiator?: 'student' | 'teacher' | null
+          needs_refill?: boolean
+          refill_requested_at?: string | null
+          refill_reason?: string | null
+          refill_resolved_at?: string | null
+          refill_resolved_note?: string | null
         }
       }
       admins: {
@@ -97,10 +117,21 @@ export interface User {
   advisor?: string
 }
 
+// 联系发起方的取值
+export type ContactInitiator = 'student' | 'teacher'
+
 export interface ReportFormData {
   contacted_professor: boolean
+  // 仅当 contacted_professor = true 时有效
+  contact_initiator?: ContactInitiator | null
   professor_replied: boolean | null
   reply_details: string
+  not_contacted_reason?: string
+  preparation_work?: string
+  question_list?: string
+  advisor_feedback?: string
+  // 重填相关
+  refill_resolved_note?: string
 }
 
 export interface ReportWithStudent extends WeeklyReport {
@@ -122,6 +153,12 @@ export interface WeeklyReport {
   reply_details: string | null
   screenshot_urls: string[] | null
   submitted_at: string
+  contact_initiator: ContactInitiator | null
+  needs_refill: boolean
+  refill_requested_at: string | null
+  refill_reason: string | null
+  refill_resolved_at: string | null
+  refill_resolved_note: string | null
 }
 
 export interface Student {
@@ -131,4 +168,10 @@ export interface Student {
   squad: string
   advisor: string
   created_at: string
+}
+
+// 联系发起方对应的展示文本
+export const CONTACT_INITIATOR_LABELS: Record<ContactInitiator, string> = {
+  student: '我主动联系老师',
+  teacher: '老师主动联系我',
 }

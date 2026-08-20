@@ -14,7 +14,15 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { contacted_professor, professor_replied, reply_details, signature, not_contacted_reason } = body
+    const {
+      contacted_professor,
+      contact_initiator,
+      professor_replied,
+      reply_details,
+      signature,
+      not_contacted_reason,
+      refill_note,
+    } = body
 
     const supabase = createServiceClient()
 
@@ -35,6 +43,9 @@ export async function POST(request: NextRequest) {
     // 构建更新数据对象
     const updateData: any = {
       contacted_professor,
+      contact_initiator: contacted_professor
+        ? (contact_initiator === 'teacher' ? 'teacher' : 'student')
+        : null,
       professor_replied: contacted_professor ? professor_replied : null,
       reply_details: contacted_professor ? reply_details : null,
       signature: signature || null,
@@ -46,19 +57,36 @@ export async function POST(request: NextRequest) {
       updateData.not_contacted_reason = !contacted_professor ? not_contacted_reason : null
     }
 
-    // 执行更新（不返回数据）
+    // 如果学生是在响应重填请求（needs_refill=true 且尚未解决），则记录完成
+    if (existing.needs_refill && !existing.refill_resolved_at) {
+      updateData.needs_refill = false
+      updateData.refill_resolved_at = new Date().toISOString()
+      updateData.refill_resolved_note = refill_note || null
+    }
+
+    // 执行更新
     const { error } = await supabase
       .from('weekly_reports')
       .update(updateData)
       .eq('id', id)
 
     if (error) {
-      // 如果错误是因为 not_contacted_reason 字段不存在，则重试不包含该字段
-      if (error.message && error.message.includes('not_contacted_reason')) {
-        const { not_contacted_reason: _, ...updateDataRetry } = updateData
+      const msg = error.message || ''
+      // 如果错误是因为某些新字段不存在，则重试不包含这些字段
+      if (msg.includes('not_contacted_reason') ||
+          msg.includes('contact_initiator') ||
+          msg.includes('needs_refill')) {
+        const retryData = { ...updateData }
+        delete retryData.contact_initiator
+        delete retryData.needs_refill
+        delete retryData.refill_resolved_at
+        delete retryData.refill_resolved_note
+        if (msg.includes('not_contacted_reason')) {
+          delete retryData.not_contacted_reason
+        }
         const retryResult = await supabase
           .from('weekly_reports')
-          .update(updateDataRetry)
+          .update(retryData)
           .eq('id', id)
 
         if (retryResult.error) {

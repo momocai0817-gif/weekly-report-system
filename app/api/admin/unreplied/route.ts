@@ -14,6 +14,10 @@ interface UnrepliedCase {
   currentYear: number
   previousWeek: number
   previousYear: number
+  // 本周的联系发起方
+  contact_initiator?: 'student' | 'teacher' | null
+  // 上周的联系发起方
+  previous_contact_initiator?: 'student' | 'teacher' | null
 }
 
 export async function GET(request: NextRequest) {
@@ -51,7 +55,7 @@ export async function GET(request: NextRequest) {
     // 获取上一周的周报（学生咨询过但导师未回复）
     const { data: previousWeekReports, error: previousError } = await supabase
       .from('weekly_reports')
-      .select('student_id')
+      .select('student_id, contact_initiator')
       .eq('week_number', previousWeekNumber)
       .eq('year', previousYearNumber)
       .eq('contacted_professor', true)
@@ -63,6 +67,9 @@ export async function GET(request: NextRequest) {
     const previousWeekStudentIds = new Set(
       previousWeekReports?.map((r) => r.student_id) || []
     )
+    const previousWeekInitiatorMap = new Map(
+      (previousWeekReports || []).map((r) => [r.student_id, r.contact_initiator])
+    )
 
     const unrepliedCases: UnrepliedCase[] = (currentWeekReports || [])
       .filter((report) => previousWeekStudentIds.has(report.student_id))
@@ -72,6 +79,8 @@ export async function GET(request: NextRequest) {
         currentYear: currentYearNumber,
         previousWeek: previousWeekNumber,
         previousYear: previousYearNumber,
+        contact_initiator: (report as any).contact_initiator || null,
+        previous_contact_initiator: previousWeekInitiatorMap.get(report.student_id) || null,
       }))
 
     return NextResponse.json({

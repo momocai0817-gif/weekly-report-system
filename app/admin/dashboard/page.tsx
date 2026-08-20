@@ -478,7 +478,7 @@ export default function AdminDashboardPage() {
         </div>
 
         {/* 快捷操作 */}
-        <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
           <button
             onClick={() => router.push('/admin/students')}
             className="bg-white rounded-xl shadow-sm p-4 text-left hover:shadow-md transition"
@@ -495,6 +495,15 @@ export default function AdminDashboardPage() {
             <div className="text-2xl mb-2">📝</div>
             <h4 className="font-medium text-gray-800">查看周报</h4>
             <p className="text-sm text-gray-500">查看学生提交的内容</p>
+          </button>
+
+          <button
+            onClick={() => router.push('/admin/refill')}
+            className="bg-white rounded-xl shadow-sm p-4 text-left hover:shadow-md transition border-2 border-orange-200"
+          >
+            <div className="text-2xl mb-2">🔄</div>
+            <h4 className="font-medium text-gray-800">重填管理</h4>
+            <p className="text-sm text-gray-500">数据有误时通知学生重填</p>
           </button>
 
           <button

@@ -36,6 +36,14 @@ export interface WeeklyReport {
   reply_details: string | null
   signature: string | null
   submitted_at: string
+  // 联系发起方：student=学生主动联系老师 / teacher=老师主动联系学生
+  contact_initiator: 'student' | 'teacher' | null
+  // 重填管理
+  needs_refill: boolean
+  refill_requested_at: string | null
+  refill_reason: string | null
+  refill_resolved_at: string | null
+  refill_resolved_note: string | null
 }
 
 export interface Admin {
