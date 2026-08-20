@@ -293,21 +293,6 @@ export default function StudentReportForm({ isRefillMode }: { isRefillMode: bool
         <div className="bg-white rounded-xl shadow-sm p-6">
           <h3 className="text-lg font-medium text-gray-800 mb-6">{theme.pageTitle}</h3>
 
-          {/* 填写要求 */}
-          {formData.contacted_professor && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-              <h4 className="font-medium text-blue-800 mb-2">📝 填写要求</h4>
-              <ul className="text-sm text-blue-700 space-y-1">
-                <li>• <strong>联系发起方：</strong>请如实选择是你主动联系还是老师主动联系</li>
-                <li>• <strong>准备工作：</strong>详细描述你为本次咨询所做的准备工作（≥30字）</li>
-                <li>• <strong>问题清单：</strong>列出至少1个本周已向导师咨询过的具体问题</li>
-                {formData.professor_replied && (
-                  <li>• <strong>导师反馈：</strong>记录导师的具体指导内容（≥30字）</li>
-                )}
-              </ul>
-            </div>
-          )}
-
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* 问题1：是否咨询过老师 */}
             <div>

@@ -34,6 +34,8 @@ export default function AdminRefillPage() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
 
   const currentWeek = getCurrentWeek()
+  const [selectedWeek, setSelectedWeek] = useState(currentWeek.weekNumber)
+  const [selectedYear, setSelectedYear] = useState(currentWeek.year)
 
   useEffect(() => {
     const userStr = localStorage.getItem('user')
@@ -50,12 +52,14 @@ export default function AdminRefillPage() {
 
     setUser(userData)
     fetchRefillList()
-  }, [router])
+  }, [router, selectedWeek, selectedYear])
 
   const fetchRefillList = async () => {
     setLoading(true)
     try {
-      const response = await fetch('/api/admin/refill/list')
+      const response = await fetch(
+        `/api/admin/refill/list?week=${selectedWeek}&year=${selectedYear}`
+      )
       const data = await response.json()
       setReports(data.reports || [])
     } catch (err) {
@@ -69,27 +73,39 @@ export default function AdminRefillPage() {
     router.push('/admin/dashboard')
   }
 
-  const handleExport = async () => {
+  const downloadFile = async (url: string, fallbackName: string) => {
+    const response = await fetch(url)
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}))
+      alert(data.error || '导出失败')
+      return
+    }
+    const blob = await response.blob()
+    const blobUrl = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = blobUrl
+    a.download = fallbackName
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    window.URL.revokeObjectURL(blobUrl)
+  }
+
+  const handleExportExcel = async () => {
+    const url = `/api/admin/export/refill-reports?week=${selectedWeek}&year=${selectedYear}`
+    const filename = `重填周报_第${selectedWeek}周.xlsx`
     try {
-      const response = await fetch('/api/admin/export/refill')
+      await downloadFile(url, filename)
+    } catch (err: any) {
+      alert(err.message || '导出失败')
+    }
+  }
 
-      if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error || '导出失败')
-      }
-
-      const blob = await response.blob()
-      const blobUrl = window.URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = blobUrl
-      const filename = `重填名单_${currentWeek.weekNumber}周_${currentWeek.year}年.xlsx`
-      a.download = filename
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      window.URL.revokeObjectURL(blobUrl)
-
-      alert(`已导出 ${reports.length} 条重填记录\n文件名：${filename}`)
+  const handleExportSignatures = async () => {
+    const url = `/api/admin/export/refill-signatures?week=${selectedWeek}&year=${selectedYear}`
+    const filename = `重填周报_签名_第${selectedWeek}周.zip`
+    try {
+      await downloadFile(url, filename)
     } catch (err: any) {
       alert(err.message || '导出失败')
     }
@@ -115,7 +131,7 @@ export default function AdminRefillPage() {
         <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
           <div>
             <h1 className="text-xl font-bold text-gray-800">论文指导周报系统</h1>
-            <p className="text-sm text-gray-500">重填管理</p>
+            <p className="text-sm text-gray-500">重填周报</p>
           </div>
           <button
             onClick={handleBack}
@@ -127,20 +143,66 @@ export default function AdminRefillPage() {
       </header>
 
       <main className="max-w-6xl mx-auto px-4 py-8">
-        {/* 统计 + 导出 */}
-        <div className="bg-white rounded-xl shadow-sm p-4 mb-6 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-sm text-gray-500">本周已重填</p>
-            <p className="text-3xl font-bold text-green-600">{reports.length}</p>
+        {/* 周次 + 导出 */}
+        <div className="bg-white rounded-xl shadow-sm p-4 mb-6">
+          <div className="flex flex-wrap items-center gap-4 justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-gray-600">年份:</label>
+                <input
+                  type="number"
+                  value={selectedYear}
+                  onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                  className="w-20 px-2 py-1 border border-gray-300 rounded text-center"
+                  style={{ color: '#000', WebkitTextFillColor: '#000' }}
+                  min={2020}
+                  max={2030}
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-gray-600">周次:</label>
+                <input
+                  type="number"
+                  value={selectedWeek}
+                  onChange={(e) => setSelectedWeek(parseInt(e.target.value) || 1)}
+                  className="w-16 px-2 py-1 border border-gray-300 rounded text-center"
+                  style={{ color: '#000', WebkitTextFillColor: '#000' }}
+                  min={1}
+                  max={52}
+                />
+              </div>
+              <button
+                onClick={() => {
+                  setSelectedWeek(currentWeek.weekNumber)
+                  setSelectedYear(currentWeek.year)
+                }}
+                className="text-sm text-blue-600 hover:text-blue-800"
+              >
+                回到本周
+              </button>
+              <span className="text-gray-500 ml-2">
+                共 {reports.length} 条重填记录
+                {squad1Reports.length > 0 && <span className="ml-2">一区队 {squad1Reports.length} 人</span>}
+                {squad2Reports.length > 0 && <span className="ml-2">二区队 {squad2Reports.length} 人</span>}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleExportExcel}
+                disabled={reports.length === 0}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center gap-2"
+              >
+                📊 导出周报 Excel
+              </button>
+              <button
+                onClick={handleExportSignatures}
+                disabled={reports.length === 0}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center gap-2"
+              >
+                🖼️ 导出签名 zip
+              </button>
+            </div>
           </div>
-          <button
-            onClick={handleExport}
-            disabled={reports.length === 0}
-            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center gap-2"
-          >
-            📊 导出重填名单
-            <span className="text-xs opacity-75">({reports.length}人)</span>
-          </button>
         </div>
 
         {/* 列表 */}
@@ -151,7 +213,7 @@ export default function AdminRefillPage() {
         ) : reports.length === 0 ? (
           <div className="bg-white rounded-xl shadow-sm p-8 text-center text-gray-500">
             <div className="text-4xl mb-2">🎉</div>
-            <p>本周暂无重填记录</p>
+            <p>第 {selectedWeek} 周 暂无重填记录</p>
           </div>
         ) : (
           <div className="space-y-4">

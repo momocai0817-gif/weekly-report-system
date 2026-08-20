@@ -502,8 +502,8 @@ export default function AdminDashboardPage() {
             className="bg-white rounded-xl shadow-sm p-4 text-left hover:shadow-md transition border-2 border-green-200"
           >
             <div className="text-2xl mb-2">🔄</div>
-            <h4 className="font-medium text-gray-800">重填名单</h4>
-            <p className="text-sm text-gray-500">查看与导出已重填的学生</p>
+            <h4 className="font-medium text-gray-800">重填周报</h4>
+            <p className="text-sm text-gray-500">查看与导出学生重填的周报</p>
           </button>
 
           <button
