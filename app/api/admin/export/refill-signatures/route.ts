@@ -7,6 +7,7 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams
     const week = searchParams.get('week')
     const year = searchParams.get('year')
+    const squad = searchParams.get('squad')
 
     const supabase = createServiceClient()
 
@@ -23,10 +24,7 @@ export async function GET(request: NextRequest) {
     if (week) filtered = filtered.filter((r: any) => r.week_number === parseInt(week))
     if (year) filtered = filtered.filter((r: any) => r.year === parseInt(year))
 
-    if (filtered.length === 0) {
-      return NextResponse.json({ error: '暂无重填记录' }, { status: 404 })
-    }
-
+    // 关联学生
     const studentIds = Array.from(new Set(filtered.map((r: any) => r.student_id)))
     const studentMap = new Map<string, any>()
     const { data: students } = await supabase
@@ -35,23 +33,42 @@ export async function GET(request: NextRequest) {
       .in('id', studentIds as string[])
     ;(students || []).forEach((s: any) => studentMap.set(s.id, s))
 
-    const zip = new JSZip()
-    const squad1Folder = zip.folder('一区队')
-    const squad2Folder = zip.folder('二区队')
+    if (squad) filtered = filtered.filter((r: any) => studentMap.get(r.student_id)?.squad === squad)
 
-    filtered.forEach((report: any) => {
-      const student = studentMap.get(report.student_id)
-      if (!student || !report.signature) return
-      const filename = `${student.name}_${student.student_id}.png`
-      const base64Data = report.signature.replace(/^data:image\/\w+;base64,/, '')
-      const buffer = Buffer.from(base64Data, 'base64')
-      if (student.squad === '一区队') squad1Folder?.file(filename, buffer)
-      else if (student.squad === '二区队') squad2Folder?.file(filename, buffer)
-    })
+    if (filtered.length === 0) {
+      return NextResponse.json({ error: '暂无重填记录' }, { status: 404 })
+    }
+
+    const zip = new JSZip()
+
+    if (squad) {
+      // 指定区队时直接放散文件，不分子目录
+      filtered.forEach((report: any) => {
+        const student = studentMap.get(report.student_id)
+        if (!student || !report.signature) return
+        const filename = `${student.name}_${student.student_id}.png`
+        const base64Data = report.signature.replace(/^data:image\/\w+;base64,/, '')
+        const buffer = Buffer.from(base64Data, 'base64')
+        zip.file(filename, buffer)
+      })
+    } else {
+      const squad1Folder = zip.folder('一区队')
+      const squad2Folder = zip.folder('二区队')
+      filtered.forEach((report: any) => {
+        const student = studentMap.get(report.student_id)
+        if (!student || !report.signature) return
+        const filename = `${student.name}_${student.student_id}.png`
+        const base64Data = report.signature.replace(/^data:image\/\w+;base64,/, '')
+        const buffer = Buffer.from(base64Data, 'base64')
+        if (student.squad === '一区队') squad1Folder?.file(filename, buffer)
+        else if (student.squad === '二区队') squad2Folder?.file(filename, buffer)
+      })
+    }
 
     const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' })
     const weekPart = week ? `第${week}周` : '全部'
-    const filename = `重填周报_签名_${weekPart}.zip`
+    const squadPart = squad ? `_${squad}` : ''
+    const filename = `重填周报_签名${squadPart}_${weekPart}.zip`
 
     return new NextResponse(new Uint8Array(zipBuffer), {
       headers: {

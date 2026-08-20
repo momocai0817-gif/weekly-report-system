@@ -91,9 +91,9 @@ export default function AdminRefillPage() {
     window.URL.revokeObjectURL(blobUrl)
   }
 
-  const handleExportExcel = async () => {
-    const url = `/api/admin/export/refill-reports?week=${selectedWeek}&year=${selectedYear}`
-    const filename = `重填周报_第${selectedWeek}周.xlsx`
+  const handleExportReports = async (squad: '一区队' | '二区队') => {
+    const url = `/api/admin/export/refill-reports?week=${selectedWeek}&year=${selectedYear}&squad=${encodeURIComponent(squad)}`
+    const filename = `重填周报_${squad}_第${selectedWeek}周.xlsx`
     try {
       await downloadFile(url, filename)
     } catch (err: any) {
@@ -101,9 +101,9 @@ export default function AdminRefillPage() {
     }
   }
 
-  const handleExportSignatures = async () => {
-    const url = `/api/admin/export/refill-signatures?week=${selectedWeek}&year=${selectedYear}`
-    const filename = `重填周报_签名_第${selectedWeek}周.zip`
+  const handleExportSignatures = async (squad: '一区队' | '二区队') => {
+    const url = `/api/admin/export/refill-signatures?week=${selectedWeek}&year=${selectedYear}&squad=${encodeURIComponent(squad)}`
+    const filename = `重填周报_签名_${squad}_第${selectedWeek}周.zip`
     try {
       await downloadFile(url, filename)
     } catch (err: any) {
@@ -161,15 +161,31 @@ export default function AdminRefillPage() {
               </div>
               <div className="flex items-center gap-2">
                 <label className="text-sm text-gray-600">周次:</label>
-                <input
-                  type="number"
-                  value={selectedWeek}
-                  onChange={(e) => setSelectedWeek(parseInt(e.target.value) || 1)}
-                  className="w-16 px-2 py-1 border border-gray-300 rounded text-center"
-                  style={{ color: '#000', WebkitTextFillColor: '#000' }}
-                  min={1}
-                  max={52}
-                />
+                <div className="flex items-center">
+                  <input
+                    type="number"
+                    value={selectedWeek}
+                    onChange={(e) => setSelectedWeek(parseInt(e.target.value) || 1)}
+                    className="w-16 px-2 py-1 border border-gray-300 rounded-l text-center"
+                    style={{ color: '#000', WebkitTextFillColor: '#000' }}
+                    min={1}
+                    max={52}
+                  />
+                  <div className="flex flex-col border border-l-0 border-gray-300 rounded-r overflow-hidden">
+                    <button
+                      onClick={() => setSelectedWeek(Math.min(52, selectedWeek + 1))}
+                      className="px-2 py-0.5 text-gray-600 hover:bg-gray-100 text-xs leading-none border-b border-gray-300"
+                    >
+                      ▲
+                    </button>
+                    <button
+                      onClick={() => setSelectedWeek(Math.max(1, selectedWeek - 1))}
+                      className="px-2 py-0.5 text-gray-600 hover:bg-gray-100 text-xs leading-none"
+                    >
+                      ▼
+                    </button>
+                  </div>
+                </div>
               </div>
               <button
                 onClick={() => {
@@ -186,20 +202,34 @@ export default function AdminRefillPage() {
                 {squad2Reports.length > 0 && <span className="ml-2">二区队 {squad2Reports.length} 人</span>}
               </span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <button
-                onClick={handleExportExcel}
-                disabled={reports.length === 0}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center gap-2"
+                onClick={() => handleExportReports('一区队')}
+                disabled={squad1Reports.length === 0}
+                className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition text-sm flex items-center gap-1"
               >
-                📊 导出周报 Excel
+                📊 一区队 Excel
               </button>
               <button
-                onClick={handleExportSignatures}
-                disabled={reports.length === 0}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center gap-2"
+                onClick={() => handleExportReports('二区队')}
+                disabled={squad2Reports.length === 0}
+                className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition text-sm flex items-center gap-1"
               >
-                🖼️ 导出签名 zip
+                📊 二区队 Excel
+              </button>
+              <button
+                onClick={() => handleExportSignatures('一区队')}
+                disabled={squad1Reports.length === 0}
+                className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition text-sm flex items-center gap-1"
+              >
+                🖼️ 一区队签名
+              </button>
+              <button
+                onClick={() => handleExportSignatures('二区队')}
+                disabled={squad2Reports.length === 0}
+                className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition text-sm flex items-center gap-1"
+              >
+                🖼️ 二区队签名
               </button>
             </div>
           </div>

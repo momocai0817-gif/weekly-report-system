@@ -185,7 +185,7 @@ export default function StudentReportForm({ isRefillMode }: { isRefillMode: bool
         throw new Error(data.error || '提交失败')
       }
 
-      setMessage(isRefillMode ? '重填提交成功！感谢你配合重新填写。' : '提交成功！')
+      setMessage('提交成功！')
 
       setExistingReport(data.report)
       setTimeout(() => setMessage(''), 3000)

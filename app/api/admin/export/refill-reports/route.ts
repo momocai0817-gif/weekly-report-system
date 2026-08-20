@@ -7,6 +7,7 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams
     const week = searchParams.get('week')
     const year = searchParams.get('year')
+    const squad = searchParams.get('squad')
 
     const supabase = createServiceClient()
 
@@ -24,11 +25,7 @@ export async function GET(request: NextRequest) {
     if (week) filtered = filtered.filter((r: any) => r.week_number === parseInt(week))
     if (year) filtered = filtered.filter((r: any) => r.year === parseInt(year))
 
-    if (filtered.length === 0) {
-      return NextResponse.json({ error: '暂无重填记录' }, { status: 404 })
-    }
-
-    // 关联学生
+    // 关联学生（pg 版不支持嵌套 join，在 Node 端拼接）
     const studentIds = Array.from(new Set(filtered.map((r: any) => r.student_id)))
     const studentMap = new Map<string, any>()
     const { data: students } = await supabase
@@ -36,6 +33,12 @@ export async function GET(request: NextRequest) {
       .select('id, name, student_id, squad, advisor')
       .in('id', studentIds as string[])
     ;(students || []).forEach((s: any) => studentMap.set(s.id, s))
+
+    if (squad) filtered = filtered.filter((r: any) => studentMap.get(r.student_id)?.squad === squad)
+
+    if (filtered.length === 0) {
+      return NextResponse.json({ error: '暂无重填记录' }, { status: 404 })
+    }
 
     // 按学号排序
     filtered.sort((a: any, b: any) => {
@@ -98,30 +101,36 @@ export async function GET(request: NextRequest) {
 
     const workbook = XLSX.utils.book_new()
 
-    // 总表
-    const totalWs = XLSX.utils.json_to_sheet(filtered.map(reportToRow))
-    styleWorksheet(totalWs)
-    XLSX.utils.book_append_sheet(workbook, totalWs, '总表')
-
-    // 一区队
-    const squad1 = filtered.filter((r: any) => studentMap.get(r.student_id)?.squad === '一区队')
-    if (squad1.length > 0) {
-      const ws = XLSX.utils.json_to_sheet(squad1.map(reportToRow))
+    if (squad) {
+      // 指定区队时只生成该区队的 sheet
+      const ws = XLSX.utils.json_to_sheet(filtered.map(reportToRow))
       styleWorksheet(ws)
-      XLSX.utils.book_append_sheet(workbook, ws, '一区队')
-    }
+      XLSX.utils.book_append_sheet(workbook, ws, squad)
+    } else {
+      // 未指定区队时生成总表 + 一区队 + 二区队
+      const totalWs = XLSX.utils.json_to_sheet(filtered.map(reportToRow))
+      styleWorksheet(totalWs)
+      XLSX.utils.book_append_sheet(workbook, totalWs, '总表')
 
-    // 二区队
-    const squad2 = filtered.filter((r: any) => studentMap.get(r.student_id)?.squad === '二区队')
-    if (squad2.length > 0) {
-      const ws = XLSX.utils.json_to_sheet(squad2.map(reportToRow))
-      styleWorksheet(ws)
-      XLSX.utils.book_append_sheet(workbook, ws, '二区队')
+      const squad1 = filtered.filter((r: any) => studentMap.get(r.student_id)?.squad === '一区队')
+      if (squad1.length > 0) {
+        const ws = XLSX.utils.json_to_sheet(squad1.map(reportToRow))
+        styleWorksheet(ws)
+        XLSX.utils.book_append_sheet(workbook, ws, '一区队')
+      }
+
+      const squad2 = filtered.filter((r: any) => studentMap.get(r.student_id)?.squad === '二区队')
+      if (squad2.length > 0) {
+        const ws = XLSX.utils.json_to_sheet(squad2.map(reportToRow))
+        styleWorksheet(ws)
+        XLSX.utils.book_append_sheet(workbook, ws, '二区队')
+      }
     }
 
     const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx', bookSST: false })
     const weekPart = week ? `第${week}周` : '全部'
-    const filename = `重填周报_${weekPart}.xlsx`
+    const squadPart = squad ? `_${squad}` : ''
+    const filename = `重填周报${squadPart}_${weekPart}.xlsx`
 
     return new NextResponse(new Uint8Array(excelBuffer), {
       headers: {
