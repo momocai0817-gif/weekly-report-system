@@ -3,19 +3,21 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
+type StudentIntent = 'submit' | 'refill'
+
 export default function LoginPage() {
   const router = useRouter()
   const [userType, setUserType] = useState<'student' | 'admin'>('student')
+  // 学生身份下：提交周报 / 重填周报
+  const [studentIntent, setStudentIntent] = useState<StudentIntent>('submit')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  // 学生表单
   const [studentForm, setStudentForm] = useState({
     name: '',
     studentId: '',
   })
 
-  // 管理员表单
   const [adminForm, setAdminForm] = useState({
     username: '',
     password: '',
@@ -25,9 +27,6 @@ export default function LoginPage() {
     e.preventDefault()
     setLoading(true)
     setError('')
-
-    // DEBUG: 打印发送的数据
-    console.log('学生登录 - 发送的数据:', studentForm)
 
     try {
       const response = await fetch('/api/auth/login', {
@@ -40,17 +39,18 @@ export default function LoginPage() {
       })
 
       const data = await response.json()
-      console.log('学生登录 - 响应:', data)
 
       if (!response.ok) {
         throw new Error(data.error || '登录失败')
       }
 
-      // 保存用户信息到 localStorage
       localStorage.setItem('user', JSON.stringify(data.user))
 
-      // 跳转到学生端
-      router.push('/student/report')
+      // 重填模式登录后跳转到 ?refill=1
+      const redirect = studentIntent === 'refill'
+        ? '/student/report?refill=1'
+        : '/student/report'
+      router.push(redirect)
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -137,45 +137,87 @@ export default function LoginPage() {
 
           {/* 学生登录表单 */}
           {userType === 'student' ? (
-            <form onSubmit={handleStudentLogin} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  姓名
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={studentForm.name}
-                  onChange={(e) =>
-                    setStudentForm({ ...studentForm, name: e.target.value })
-                  }
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition text-gray-900"
-                  placeholder="请输入姓名"
-                />
+            <>
+              {/* 提交 / 重填 二选一 */}
+              <div className="flex mb-4 bg-gray-50 rounded-lg p-1 border border-gray-200">
+                <button
+                  type="button"
+                  onClick={() => setStudentIntent('submit')}
+                  className={`flex-1 py-2 rounded-md text-sm transition-colors ${
+                    studentIntent === 'submit'
+                      ? 'bg-white text-blue-600 shadow'
+                      : 'text-gray-600 hover:text-gray-800'
+                  }`}
+                >
+                  📝 提交周报
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStudentIntent('refill')}
+                  className={`flex-1 py-2 rounded-md text-sm transition-colors ${
+                    studentIntent === 'refill'
+                      ? 'bg-white text-orange-600 shadow'
+                      : 'text-gray-600 hover:text-gray-800'
+                  }`}
+                >
+                  🔄 重填周报
+                </button>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  学号
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={studentForm.studentId}
-                  onChange={(e) =>
-                    setStudentForm({ ...studentForm, studentId: e.target.value })
-                  }
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition text-gray-900"
-                  placeholder="请输入学号"
-                />
-              </div>
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
-              >
-                {loading ? '登录中...' : '登录'}
-              </button>
-            </form>
+
+              {studentIntent === 'refill' && (
+                <div className="mb-4 p-3 bg-orange-50 border border-orange-200 rounded-lg text-xs text-orange-700 leading-relaxed">
+                  请确认学委/老师已通知你重新填写本周周报后再进入。
+                </div>
+              )}
+
+              <form onSubmit={handleStudentLogin} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    姓名
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={studentForm.name}
+                    onChange={(e) =>
+                      setStudentForm({ ...studentForm, name: e.target.value })
+                    }
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition text-gray-900"
+                    placeholder="请输入姓名"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    学号
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={studentForm.studentId}
+                    onChange={(e) =>
+                      setStudentForm({ ...studentForm, studentId: e.target.value })
+                    }
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition text-gray-900"
+                    placeholder="请输入学号"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className={`w-full text-white py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition ${
+                    studentIntent === 'refill'
+                      ? 'bg-orange-600 hover:bg-orange-700'
+                      : 'bg-blue-600 hover:bg-blue-700'
+                  }`}
+                >
+                  {loading ? '登录中...' : '登录'}
+                </button>
+              </form>
+
+              <p className="mt-6 text-center text-sm text-gray-500">
+                请使用白名单中的姓名和学号登录
+              </p>
+            </>
           ) : (
             /* 管理员登录表单 */
             <form onSubmit={handleAdminLogin} className="space-y-4">
@@ -218,12 +260,6 @@ export default function LoginPage() {
               </button>
             </form>
           )}
-
-          <p className="mt-6 text-center text-sm text-gray-500">
-            {userType === 'student'
-              ? '请使用白名单中的姓名和学号登录'
-              : '管理员专用登录入口'}
-          </p>
         </div>
       </div>
     </div>
