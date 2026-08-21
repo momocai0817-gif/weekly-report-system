@@ -1,0 +1,50 @@
+========================================
+   Netlify 环境变量配置
+========================================
+
+请将以下变量复制到 Netlify 的 Environment variables 中：
+
+----------------------------------------
+NEXT_PUBLIC_SUPABASE_URL
+----------------------------------------
+https://gagjnctsiyszzzlviycz.supabase.co
+
+----------------------------------------
+NEXT_PUBLIC_SUPABASE_ANON_KEY
+----------------------------------------
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdhZ2puY3RzaXlzenp6bHZpeWN6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ1NzIxMzUsImV4cCI6MjEwMDE0ODEzNX0.HDhnXIX1QEOw43S09kZtSZJIhaS9AyTgiK6UuaioqZE
+
+----------------------------------------
+SUPABASE_SERVICE_ROLE_KEY
+----------------------------------------
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdhZ2puY3RzaXlzenp6bHZpeWN6Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NDU3MjEzNSwiZXhwIjoyMTAwMTQ4MTM1fQ._Osm7k58IK7Th4SyJg6aTQ6III8ALm_Be5e0RYvjq1w
+
+----------------------------------------
+ADMIN_USERNAME
+----------------------------------------
+admin
+
+----------------------------------------
+ADMIN_PASSWORD
+----------------------------------------
+admin123
+
+----------------------------------------
+SEMESTER_START_DATE
+----------------------------------------
+2025-02-24
+
+----------------------------------------
+WEEKLY_DEADLINE
+----------------------------------------
+Sunday 23:59
+
+========================================
+
+部署步骤:
+1. 访问 https://app.netlify.com/projects/weekly-report-system
+2. 点击 Site configuration → Environment variables
+3. 对每个变量点击 "Add a variable"
+4. 粘贴对应的名称和值
+5. 保存后点击 Deploy
+========================================
