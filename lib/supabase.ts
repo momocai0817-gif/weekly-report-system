@@ -26,15 +26,16 @@ function param(value: any) {
   return value
 }
 
-// 构造 WHERE 片段
-function buildWhere(filters: Filter[]): { sql: string; params: any[] } {
+// 构造 WHERE 片段。offset：前面语句（如 UPDATE 的 SET）已占用的参数个数，
+// 占位符必须从 offset+1 开始编号，否则 UPDATE 时 WHERE 会错拿 SET 的参数值。
+function buildWhere(filters: Filter[], offset = 0): { sql: string; params: any[] } {
   if (filters.length === 0) return { sql: '', params: [] }
   const parts: string[] = []
   const params: any[] = []
   for (const f of filters) {
     if (f.type === 'eq') {
       params.push(param(f.val))
-      parts.push(`${quoteIdent(f.col)} = $${params.length}`)
+      parts.push(`${quoteIdent(f.col)} = $${offset + params.length}`)
     } else if (f.type === 'in') {
       const arr = (f.val as any[]).map((v) => param(v))
       if (arr.length === 0) {
@@ -44,7 +45,7 @@ function buildWhere(filters: Filter[]): { sql: string; params: any[] } {
         const placeholders: string[] = []
         for (const v of arr) {
           params.push(v)
-          placeholders.push(`$${params.length}`)
+          placeholders.push(`$${offset + params.length}`)
         }
         parts.push(`${quoteIdent(f.col)} IN (${placeholders.join(',')})`)
       }
@@ -167,8 +168,9 @@ class QueryChain<T = any> implements PromiseLike<QueryResultArray> {
         const res = await conn.query(sqlText, vals)
         rows = res.rows
       } else if (this._mode === 'update') {
-        const w = buildWhere(this._filters)
         const { setSql, vals } = buildSet(this._payload)
+        // SET 先占用 $1..$N，WHERE 的占位符要从 N+1 开始编号
+        const w = buildWhere(this._filters, vals.length)
         const fullVals = [...vals, ...w.params]
         const sqlText = `UPDATE ${quoteIdent(this._table)} SET ${setSql} ${w.sql} RETURNING *`
         const res = await conn.query(sqlText, fullVals)
