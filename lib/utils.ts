@@ -35,10 +35,13 @@ function shanghaiToEpoch(
 }
 
 // 计算当前是第几周（基于学期开始日期）。
-// 周的定义：北京时间 周一 23:59 → 下周一 23:59。
+// 周的定义：北京时间 周二 00:00 → 下周一 23:59（截止线 = 每周一 23:59）。
 // 提交时间未过「本周一 23:59（北京时间）」截止点时，周报归属上一周；过了截止点则归属本周。
 // 传入 now 以便服务端（提交接口）与客户端（页面展示）共用同一份逻辑，避免周次漂移。
 export function getCurrentWeek(now: Date = new Date()): { weekNumber: number; year: number } {
+  // 注意：客户端 bundle 里 process.env 不会注入服务端变量，实际生效的是这里的默认值；
+  // .env.local 的 WEEKLY_DEADLINE 只影响服务端。两处必须保持一致（都是 Monday 23:59），
+  // 否则浏览器和服务端会算出不同的周次 —— 之前 26/27 周切分就是因为 .env.local 覆盖成了 Sunday。
   const deadline = process.env.WEEKLY_DEADLINE || 'Monday 23:59'
   const [dayName, time] = deadline.split(' ')
   const [dHour, dMinute] = time.split(':').map(Number)

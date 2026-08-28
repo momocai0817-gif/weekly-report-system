@@ -1,23 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/supabase'
+import { Pool } from 'pg'
 import { getCurrentWeek } from '@/lib/utils'
 
-interface UnrepliedCase {
-  student: {
-    id: string
-    name: string
-    student_id: string
-    squad: string
-    advisor: string
-  }
-  currentWeek: number
-  currentYear: number
-  previousWeek: number
-  previousYear: number
-  // 本周的联系发起方
-  contact_initiator?: 'student' | 'teacher' | null
-  // 上周的联系发起方
-  previous_contact_initiator?: 'student' | 'teacher' | null
+const pool = new Pool({
+  connectionString:
+    process.env.DATABASE_URL ||
+    'postgres://weekly:weekly_app_2026@127.0.0.1:5432/weekly_report',
+  max: 5,
+})
+
+// 跨年安全地把 (year, week) 折叠成一个可比序号
+function weekSeq(year: number, week: number): number {
+  return year * 60 + week
+}
+
+interface UnrepliedRow {
+  student_id: string
+  week_number: number
+  year: number
+  contact_initiator: 'student' | 'teacher' | null
+  name: string
+  student_id_label: string
+  squad: string
+  advisor: string
 }
 
 export async function GET(request: NextRequest) {
@@ -26,12 +31,12 @@ export async function GET(request: NextRequest) {
     const week = searchParams.get('week')
     const year = searchParams.get('year')
 
-    // 计算要检测的周次（默认为当前周和上一周）
+    // 计算检测截止周（默认当前周），向前扫描所有历史周报
     const currentWeekData = getCurrentWeek()
     const currentWeekNumber = week ? parseInt(week) : currentWeekData.weekNumber
     const currentYearNumber = year ? parseInt(year) : currentWeekData.year
 
-    // 计算上一周
+    // 上一周（用于「连续两周」提示文案）
     let previousWeekNumber = currentWeekNumber - 1
     let previousYearNumber = currentYearNumber
     if (previousWeekNumber < 1) {
@@ -39,58 +44,118 @@ export async function GET(request: NextRequest) {
       previousYearNumber = currentYearNumber - 1
     }
 
-    const supabase = createServiceClient()
-
-    // 获取当前周的周报（学生咨询过但导师未回复）
-    const { data: currentWeekReports, error: currentError } = await supabase
-      .from('weekly_reports')
-      .select('*, student:students(id, name, student_id, squad, advisor)')
-      .eq('week_number', currentWeekNumber)
-      .eq('year', currentYearNumber)
-      .eq('contacted_professor', true)
-      .eq('professor_replied', false)
-
-    if (currentError) throw currentError
-
-    // 获取上一周的周报（学生咨询过但导师未回复）
-    const { data: previousWeekReports, error: previousError } = await supabase
-      .from('weekly_reports')
-      .select('student_id, contact_initiator')
-      .eq('week_number', previousWeekNumber)
-      .eq('year', previousYearNumber)
-      .eq('contacted_professor', true)
-      .eq('professor_replied', false)
-
-    if (previousError) throw previousError
-
-    // 找出连续两周都未回复的学生
-    const previousWeekStudentIds = new Set(
-      previousWeekReports?.map((r) => r.student_id) || []
-    )
-    const previousWeekInitiatorMap = new Map(
-      (previousWeekReports || []).map((r) => [r.student_id, r.contact_initiator])
+    // 学生咨询过（contacted_professor=true）但导师未回复（professor_replied=false）
+    // 的全部记录，检测范围为「开学以来 ~ 所选周」
+    const { rows } = await pool.query(
+      `SELECT wr.student_id, wr.week_number, wr.year, wr.contact_initiator,
+              s.name, s.student_id AS student_id_label, s.squad, s.advisor
+       FROM weekly_reports wr
+       JOIN students s ON s.id = wr.student_id
+       WHERE wr.contacted_professor = TRUE
+         AND wr.professor_replied = FALSE
+         AND (wr.year < $2 OR (wr.year = $2 AND wr.week_number <= $1))
+       ORDER BY s.advisor, s.name, wr.year, wr.week_number`,
+      [currentWeekNumber, currentYearNumber]
     )
 
-    const unrepliedCases: UnrepliedCase[] = (currentWeekReports || [])
-      .filter((report) => previousWeekStudentIds.has(report.student_id))
-      .map((report) => ({
-        student: (report as any).student,
-        currentWeek: currentWeekNumber,
-        currentYear: currentYearNumber,
-        previousWeek: previousWeekNumber,
-        previousYear: previousYearNumber,
-        contact_initiator: (report as any).contact_initiator || null,
-        previous_contact_initiator: previousWeekInitiatorMap.get(report.student_id) || null,
-      }))
+    const reports = rows as unknown as UnrepliedRow[]
+
+    // 按导师 → 学生 归组，同时算每个学生的未回复周次明细和连续周数
+    const advisorMap = new Map<
+      string,
+      Map<
+        string,
+        {
+          student: {
+            id: string
+            name: string
+            student_id: string
+            squad: string
+            advisor: string
+          }
+          weeks: { week: number; year: number; contact_initiator: 'student' | 'teacher' | null }[]
+        }
+      >
+    >()
+
+    for (const r of reports) {
+      const advisor = r.advisor || '未分配导师'
+      if (!advisorMap.has(advisor)) advisorMap.set(advisor, new Map())
+      const students = advisorMap.get(advisor)!
+      if (!students.has(r.student_id)) {
+        students.set(r.student_id, {
+          student: {
+            id: r.student_id,
+            name: r.name,
+            student_id: r.student_id_label,
+            squad: r.squad,
+            advisor: r.advisor,
+          },
+          weeks: [],
+        })
+      }
+      students.get(r.student_id)!.weeks.push({
+        week: r.week_number,
+        year: r.year,
+        contact_initiator: r.contact_initiator,
+      })
+    }
+
+    // 计算每个学生的连续未回复情况（按周次连续，例如 25、26、27 周 → 连续 3 周）
+    const advisors = Array.from(advisorMap.entries()).map(([advisor, studentsMap]) => {
+      const students = Array.from(studentsMap.values()).map(({ student, weeks }) => {
+        weeks.sort((a, b) => weekSeq(a.year, a.week) - weekSeq(b.year, b.week))
+        let currentStreak = 1
+        let maxStreak = 1
+        for (let i = 1; i < weeks.length; i++) {
+          if (weekSeq(weeks[i].year, weeks[i].week) === weekSeq(weeks[i - 1].year, weeks[i - 1].week) + 1) {
+            currentStreak++
+          } else {
+            currentStreak = 1
+          }
+          if (currentStreak > maxStreak) maxStreak = currentStreak
+        }
+        return {
+          student,
+          // 未回复周次明细：第几周、当时的联系发起方
+          unrepliedDetails: weeks,
+          unrepliedWeeks: weeks.map((w) => w.week),
+          total: weeks.length,
+          currentStreak,
+          maxStreak,
+        }
+      })
+      // 连续未回复周数多的学生排前面
+      students.sort((a, b) => b.currentStreak - a.currentStreak || b.total - a.total)
+      return {
+        advisor,
+        students,
+        studentCount: students.length,
+        maxStreak: Math.max(...students.map((s) => s.currentStreak)),
+      }
+    })
+
+    // 连续未回复周数多的导师排前面
+    advisors.sort((a, b) => b.maxStreak - a.maxStreak || b.studentCount - a.studentCount)
+
+    const allStudents = advisors.flatMap((a) => a.students)
+    const scanFromWeek = reports.length
+      ? Math.min(...reports.map((r) => r.week_number))
+      : currentWeekNumber
 
     return NextResponse.json({
-      cases: unrepliedCases,
+      // 按导师分组的完整明细
+      advisors,
       summary: {
-        total: unrepliedCases.length,
+        total: allStudents.length,
+        advisorCount: advisors.length,
+        // 连续两周及以上没回复的学生数
+        consecutiveTotal: allStudents.filter((s) => s.currentStreak >= 2).length,
         currentWeek: currentWeekNumber,
         currentYear: currentYearNumber,
         previousWeek: previousWeekNumber,
         previousYear: previousYearNumber,
+        scanFromWeek,
       },
     })
   } catch (error) {

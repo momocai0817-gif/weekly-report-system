@@ -1,6 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/supabase'
 import * as XLSX from 'xlsx'
+
+interface UnrepliedDetail {
+  week: number
+  year: number
+  contact_initiator: 'student' | 'teacher' | null
+}
+
+interface UnrepliedStudent {
+  student: {
+    id: string
+    name: string
+    student_id: string
+    squad: string
+    advisor: string
+  }
+  unrepliedDetails: UnrepliedDetail[]
+  unrepliedWeeks: number[]
+  total: number
+  currentStreak: number
+  maxStreak: number
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -22,50 +42,63 @@ export async function GET(request: NextRequest) {
       throw new Error(unrepliedData.error || '获取数据失败')
     }
 
-    const { cases, summary } = unrepliedData
+    const { advisors, summary } = unrepliedData as {
+      advisors: {
+        advisor: string
+        students: UnrepliedStudent[]
+        studentCount: number
+        maxStreak: number
+      }[]
+      summary: {
+        currentWeek: number
+        currentYear: number
+        scanFromWeek: number
+      }
+    }
 
-    if (cases.length === 0) {
+    const allStudents: UnrepliedStudent[] = advisors.flatMap((a) => a.students)
+
+    if (allStudents.length === 0) {
       return NextResponse.json(
-        { error: '暂无连续两周未回复的情况' },
+        { error: '暂无学生提问但导师未回复的情况' },
         { status: 404 }
       )
     }
 
-    // 生成总表数据
-    const excelData = cases.map((item: any) => ({
-      '学号': item.student.student_id,
-      '姓名': item.student.name,
-      '区队': item.student.squad,
-      '导师': item.student.advisor,
-      '问题周次': `第${item.previousWeek}周-第${item.currentWeek}周`,
-      '年份': `${item.previousYear}-${item.currentYear}`,
-      '联系发起方': item.contact_initiator === 'student'
-        ? '学生主动'
-        : item.contact_initiator === 'teacher'
-          ? '老师主动'
-          : '未注明',
-      '情况说明': '连续两周学生咨询导师但导师未回复',
-    }))
+    // 周次明细文案：第25周(学生联系)、第26周(老师联系)
+    const weekText = (s: UnrepliedStudent) =>
+      s.unrepliedDetails
+        .map((d) => {
+          const who =
+            d.contact_initiator === 'student'
+              ? '学生联系'
+              : d.contact_initiator === 'teacher'
+                ? '老师联系'
+                : '未记录'
+          return `第${d.week}周(${who})`
+        })
+        .join('、')
+
+    const toRow = (s: UnrepliedStudent) => ({
+      '学号': s.student.student_id,
+      '姓名': s.student.name,
+      '区队': s.student.squad,
+      '导师': s.student.advisor,
+      '未回复周次明细': weekText(s),
+      '未回复周数': s.total,
+      '连续未回复周数': s.currentStreak,
+    })
+
+    // 总表：每个学生一行，写清导师、第几周未回复
+    const excelData = allStudents.map(toRow)
 
     // 按导师分组
     const advisorGroups = new Map<string, any[]>()
-    cases.forEach((item: any) => {
-      const advisor = item.student.advisor || '未分配导师'
-      if (!advisorGroups.has(advisor)) {
-        advisorGroups.set(advisor, [])
-      }
-      advisorGroups.get(advisor)!.push({
-        '学号': item.student.student_id,
-        '姓名': item.student.name,
-        '区队': item.student.squad,
-        '导师': advisor,
-        '问题周次': `第${item.previousWeek}周-第${item.currentWeek}周`,
-        '联系发起方': item.contact_initiator === 'student'
-          ? '学生主动'
-          : item.contact_initiator === 'teacher'
-            ? '老师主动'
-            : '未注明',
-      })
+    advisors.forEach((group) => {
+      advisorGroups.set(
+        group.advisor,
+        group.students.map(toRow)
+      )
     })
 
     // 创建工作簿

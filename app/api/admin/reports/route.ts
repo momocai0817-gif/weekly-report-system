@@ -1,10 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/supabase'
+import { Pool } from 'pg'
+
+const pool = new Pool({
+  connectionString:
+    process.env.DATABASE_URL ||
+    'postgres://weekly:weekly_app_2026@127.0.0.1:5432/weekly_report',
+  max: 5,
+})
 
 // 计算某周的时间范围（周一到周日）
 function getWeekRange(week: number, year: number): { start: Date; end: Date } {
   const startDate = new Date(process.env.SEMESTER_START_DATE || '2025-02-24')
-  const startOfYear = new Date(year, 0, 1)
   const startDateThisYear = new Date(year, startDate.getMonth(), startDate.getDate())
 
   // 调整到当周的周一
@@ -28,7 +34,6 @@ function getWeekRange(week: number, year: number): { start: Date; end: Date } {
 // 计算某周的截止时间（该周周一23:59:59.999）
 function getWeekDeadline(week: number, year: number): Date {
   const range = getWeekRange(week, year)
-  // 使用该周周一23:59:59作为截止时间
   const deadline = new Date(range.start)
   deadline.setHours(23, 59, 59, 999)
   return deadline
@@ -47,46 +52,63 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const supabase = createServiceClient()
+    const w = parseInt(week)
+    const y = parseInt(year)
 
-    const { data: reports, error } = await supabase
-      .from('weekly_reports')
-      .select(`
-        *,
-        student:students!inner (
-          name,
-          student_id,
-          squad,
-          advisor
-        )
-      `)
-      .eq('week_number', parseInt(week))
-      .eq('year', parseInt(year))
-      .order('submitted_at', { ascending: false })
+    // 直接用 pg JOIN 查询，避免 lib/supabase.ts 不支持 PostgREST 嵌入语法的问题
+    const { rows } = await pool.query(
+      `SELECT wr.id, wr.student_id, wr.week_number, wr.year,
+              wr.contacted_professor, wr.professor_replied, wr.reply_details,
+              wr.not_contacted_reason, wr.signature, wr.consultation_topic,
+              wr.preparation_work, wr.question_list, wr.advisor_feedback,
+              wr.follow_up_plan, wr.submitted_at, wr.contact_initiator,
+              s.name        AS s_name,
+              s.student_id  AS s_student_id,
+              s.squad       AS s_squad,
+              s.advisor     AS s_advisor
+       FROM weekly_reports wr
+       JOIN students s ON s.id = wr.student_id
+       WHERE wr.week_number = $1 AND wr.year = $2
+       ORDER BY wr.submitted_at DESC`,
+      [w, y]
+    )
 
-    if (error) {
-      throw error
-    }
-
-    // 计算该周的时间范围
-    const weekRange = getWeekRange(parseInt(week), parseInt(year))
-    const deadline = getWeekDeadline(parseInt(week), parseInt(year))
-
-    console.log(`=== 第${week}周 (${year}年) ===`)
+    const deadline = getWeekDeadline(w, y)
+    console.log(`=== 第${w}周 (${y}年) ===`)
     console.log('截止时间:', deadline.toISOString(), deadline.toLocaleString('zh-CN'))
 
-    // 标记晚交的记录：超过该周截止时间（周一23:59）提交的即为晚交
-    const reportsWithLateStatus = (reports || []).map((report: any) => {
-      const submittedAt = new Date(report.submitted_at)
+    const reports = rows.map((r: any) => {
+      const submittedAt = new Date(r.submitted_at)
       const isLate = submittedAt.getTime() > deadline.getTime()
-      console.log(`${report.student.name}: 提交于 ${submittedAt.toISOString()} (${submittedAt.toLocaleString('zh-CN')}) - ${isLate ? '晚交' : '按时'}`)
+      console.log(`${r.s_name}: 提交于 ${submittedAt.toISOString()} (${submittedAt.toLocaleString('zh-CN')}) - ${isLate ? '晚交' : '按时'}`)
       return {
-        ...report,
-        is_late: isLate
+        id: r.id,
+        student_id: r.student_id,
+        week_number: r.week_number,
+        year: r.year,
+        contacted_professor: r.contacted_professor,
+        professor_replied: r.professor_replied,
+        reply_details: r.reply_details,
+        not_contacted_reason: r.not_contacted_reason,
+        signature: r.signature,
+        consultation_topic: r.consultation_topic,
+        preparation_work: r.preparation_work,
+        question_list: r.question_list,
+        advisor_feedback: r.advisor_feedback,
+        follow_up_plan: r.follow_up_plan,
+        submitted_at: r.submitted_at,
+        contact_initiator: r.contact_initiator,
+        student: {
+          name: r.s_name,
+          student_id: r.s_student_id,
+          squad: r.s_squad,
+          advisor: r.s_advisor,
+        },
+        is_late: isLate,
       }
     })
 
-    return NextResponse.json({ reports: reportsWithLateStatus }, {
+    return NextResponse.json({ reports }, {
       headers: {
         'Cache-Control': 'no-store, no-cache, must-revalidate',
         'Pragma': 'no-cache',
@@ -99,5 +121,37 @@ export async function GET(request: NextRequest) {
       { error: '获取周报失败' },
       { status: 500 }
     )
+  }
+}
+
+// 管理员补录/修正联系发起方（历史周报提交时系统还没记录这个字段）
+export async function PATCH(request: NextRequest) {
+  try {
+    const body = await request.json()
+    const { id, contact_initiator } = body
+
+    if (!id) {
+      return NextResponse.json({ error: '缺少周报 ID' }, { status: 400 })
+    }
+    if (contact_initiator !== null && contact_initiator !== 'student' && contact_initiator !== 'teacher') {
+      return NextResponse.json(
+        { error: 'contact_initiator 只能为 student / teacher / null' },
+        { status: 400 }
+      )
+    }
+
+    const { rowCount } = await pool.query(
+      `UPDATE weekly_reports SET contact_initiator = $1 WHERE id = $2`,
+      [contact_initiator, id]
+    )
+
+    if (rowCount === 0) {
+      return NextResponse.json({ error: '周报不存在' }, { status: 404 })
+    }
+
+    return NextResponse.json({ success: true, id, contact_initiator })
+  } catch (error) {
+    console.error('更新联系发起方失败:', error)
+    return NextResponse.json({ error: '更新失败' }, { status: 500 })
   }
 }

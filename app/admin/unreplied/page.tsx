@@ -4,7 +4,13 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { getCurrentWeek } from '@/lib/utils'
 
-interface UnrepliedCase {
+interface UnrepliedDetail {
+  week: number
+  year: number
+  contact_initiator: 'student' | 'teacher' | null
+}
+
+interface UnrepliedStudent {
   student: {
     id: string
     name: string
@@ -12,18 +18,28 @@ interface UnrepliedCase {
     squad: string
     advisor: string
   }
-  currentWeek: number
-  currentYear: number
-  previousWeek: number
-  previousYear: number
+  unrepliedDetails: UnrepliedDetail[]
+  unrepliedWeeks: number[]
+  total: number
+  currentStreak: number
+  maxStreak: number
+}
+
+interface AdvisorGroup {
+  advisor: string
+  students: UnrepliedStudent[]
+  studentCount: number
+  maxStreak: number
 }
 
 export default function AdminUnrepliedPage() {
   const router = useRouter()
   const [user, setUser] = useState<any>(null)
-  const [cases, setCases] = useState<UnrepliedCase[]>([])
+  const [advisors, setAdvisors] = useState<AdvisorGroup[]>([])
   const [loading, setLoading] = useState(true)
   const [summary, setSummary] = useState<any>(null)
+  // 仅看连续两周及以上未回复的
+  const [onlyConsecutive, setOnlyConsecutive] = useState(false)
 
   const currentWeek = getCurrentWeek()
   const [selectedWeek, setSelectedWeek] = useState(currentWeek.weekNumber)
@@ -53,7 +69,7 @@ export default function AdminUnrepliedPage() {
         `/api/admin/unreplied?week=${selectedWeek}&year=${selectedYear}`
       )
       const data = await response.json()
-      setCases(data.cases || [])
+      setAdvisors(data.advisors || [])
       setSummary(data.summary)
     } catch (err) {
       console.error('获取数据失败:', err)
@@ -91,18 +107,17 @@ export default function AdminUnrepliedPage() {
     router.push('/admin/dashboard')
   }
 
-  // 按导师分组
-  const advisorGroups = cases.reduce(
-    (acc, item) => {
-      const advisor = item.student.advisor || '未分配导师'
-      if (!acc.has(advisor)) {
-        acc.set(advisor, [])
-      }
-      acc.get(advisor)!.push(item)
-      return acc
-    },
-    new Map<string, UnrepliedCase[]>()
-  )
+  // 「仅连续两周及以上」过滤
+  const visibleAdvisors: AdvisorGroup[] = onlyConsecutive
+    ? advisors
+        .map((g) => ({
+          ...g,
+          students: g.students.filter((s) => s.currentStreak >= 2),
+        }))
+        .filter((g) => g.students.length > 0)
+    : advisors
+
+  const visibleStudentCount = visibleAdvisors.reduce((n, g) => n + g.students.length, 0)
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -127,7 +142,7 @@ export default function AdminUnrepliedPage() {
       <main className="max-w-6xl mx-auto px-4 py-8">
         {/* 周次选择 */}
         <div className="bg-white rounded-xl shadow-sm p-4 mb-6">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 flex-wrap">
             <div className="flex items-center gap-2">
               <label className="text-sm text-gray-600">
                 年份:
@@ -144,7 +159,7 @@ export default function AdminUnrepliedPage() {
             </div>
             <div className="flex items-center gap-2">
               <label className="text-sm text-gray-600">
-                周次:
+                截止周:
               </label>
               <div className="flex items-center">
                 <input
@@ -181,9 +196,18 @@ export default function AdminUnrepliedPage() {
             >
               回到本周
             </button>
+            <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={onlyConsecutive}
+                onChange={(e) => setOnlyConsecutive(e.target.checked)}
+                className="w-4 h-4 accent-red-600"
+              />
+              只看连续两周及以上未回复
+            </label>
             <button
               onClick={handleExport}
-              disabled={cases.length === 0}
+              disabled={visibleStudentCount === 0}
               className="ml-auto px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
             >
               导出Excel
@@ -193,72 +217,119 @@ export default function AdminUnrepliedPage() {
 
         {/* 统计卡片 */}
         <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div>
-              <p className="text-sm text-gray-500 mb-1">
-                检测周次
-              </p>
+              <p className="text-sm text-gray-500 mb-1">检测范围</p>
               <p className="text-lg font-medium text-gray-800">
-                第{summary?.previousWeek}周 - 第{summary?.currentWeek}周
+                第{summary?.scanFromWeek}周 - 第{summary?.currentWeek}周
+              </p>
+              <p className="text-xs text-gray-400 mt-1">从开学第一次提交起累计</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-500 mb-1">涉及导师</p>
+              <p className="text-lg font-medium text-gray-800">
+                {summary?.advisorCount || 0}位
               </p>
             </div>
             <div>
-              <p className="text-sm text-gray-500 mb-1">
-                涉及学生
-              </p>
-              <p className="text-lg font-medium text-red-600">
+              <p className="text-sm text-gray-500 mb-1">有未回复情况的学生</p>
+              <p className="text-lg font-medium text-gray-800">
                 {summary?.total || 0}人
               </p>
             </div>
             <div>
-              <p className="text-sm text-gray-500 mb-1">
-                涉及导师
-              </p>
-              <p className="text-lg font-medium text-gray-800">
-                {advisorGroups.size}位
+              <p className="text-sm text-gray-500 mb-1">连续两周及以上未回复</p>
+              <p className="text-lg font-medium text-red-600">
+                {summary?.consecutiveTotal || 0}人
               </p>
             </div>
           </div>
         </div>
 
-        {/* 结果列表 */}
+        {/* 结果列表：按导师分组 */}
         {loading ? (
           <div className="text-center py-8 text-gray-500">
             加载中...
           </div>
-        ) : cases.length === 0 ? (
+        ) : visibleAdvisors.length === 0 ? (
           <div className="bg-white rounded-xl shadow-sm p-8 text-center text-gray-500">
             <div className="text-4xl mb-4">✅</div>
-            <p>该检测周期内没有连续两周学生提问但导师未回复的情况</p>
+            <p>
+              {onlyConsecutive
+                ? '没有「连续两周及以上学生提问但导师未回复」的情况'
+                : '该检测范围内没有学生提问但导师未回复的情况'}
+            </p>
           </div>
         ) : (
           <div className="space-y-6">
-            {Array.from(advisorGroups.entries()).map(([advisor, items]) => (
+            {visibleAdvisors.map(({ advisor, students, maxStreak }) => (
               <div key={advisor} className="bg-white rounded-xl shadow-sm">
                 <div className="p-4 border-b flex justify-between items-center">
                   <h3 className="font-medium text-gray-800">
-                    {advisor} ({items.length}人)
+                    导师：{advisor}
+                    <span className="text-sm text-gray-500 font-normal ml-2">
+                      {students.length}名学生有未回复
+                    </span>
                   </h3>
+                  {maxStreak >= 2 && (
+                    <span className="text-xs text-red-600 bg-red-50 px-2 py-1 rounded-full">
+                      最长连续{maxStreak}周未回复
+                    </span>
+                  )}
                 </div>
                 <div className="divide-y">
-                  {items.map((item, index) => (
+                  {students.map((item) => (
                     <div
-                      key={`${item.student.id}-${index}`}
+                      key={item.student.id}
                       className="p-4 hover:bg-gray-50"
                     >
-                      <div className="flex items-center gap-3">
-                        <span className="font-medium text-gray-900">
-                          {item.student.name}
-                        </span>
-                        <span className="text-sm text-gray-700">
-                          ({item.student.student_id})
-                        </span>
-                        <span className="text-sm text-gray-500">
-                          {item.student.squad}
-                        </span>
-                        <span className="ml-auto text-sm text-yellow-600">
-                          连续第{item.previousWeek}周-{item.currentWeek}周未回复
-                        </span>
+                      <div className="flex items-start gap-3 flex-wrap">
+                        <div className="flex items-center gap-3 min-w-[220px]">
+                          <span className="font-medium text-gray-900">
+                            {item.student.name}
+                          </span>
+                          <span className="text-sm text-gray-700">
+                            ({item.student.student_id})
+                          </span>
+                          <span className="text-sm text-gray-500">
+                            {item.student.squad}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 flex-wrap flex-1">
+                          <span className="text-xs text-gray-500 mr-1">
+                            未回复周次：
+                          </span>
+                          {item.unrepliedDetails.map((d) => (
+                            <span
+                              key={`${d.year}-${d.week}`}
+                              title={
+                                d.contact_initiator === 'student'
+                                  ? '学生主动联系'
+                                  : d.contact_initiator === 'teacher'
+                                    ? '老师主动联系'
+                                    : ''
+                              }
+                              className={`text-xs px-2 py-0.5 rounded-full ${
+                                d.contact_initiator === 'teacher'
+                                  ? 'bg-purple-100 text-purple-700'
+                                  : 'bg-yellow-100 text-yellow-700'
+                              }`}
+                            >
+                              第{d.week}周
+                            </span>
+                          ))}
+                        </div>
+                        <div className="ml-auto text-right shrink-0">
+                          {item.currentStreak >= 2 ? (
+                            <span className="text-sm text-red-600 font-medium">
+                              连续{item.currentStreak}周未回复
+                            </span>
+                          ) : (
+                            <span className="text-sm text-gray-500">
+                              累计{item.total}周未回复
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   ))}

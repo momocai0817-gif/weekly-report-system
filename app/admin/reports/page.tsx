@@ -73,6 +73,29 @@ export default function AdminReportsPage() {
     router.push('/admin/dashboard')
   }
 
+  // 补录/修正某份周报的联系发起方（历史周报没记录这个字段）
+  const handleUpdateInitiator = async (
+    reportId: string,
+    value: 'student' | 'teacher' | null
+  ) => {
+    try {
+      const response = await fetch('/api/admin/reports', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: reportId, contact_initiator: value }),
+      })
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || '更新失败')
+      }
+      setReports(prev =>
+        prev.map(r => (r.id === reportId ? { ...r, contact_initiator: value } : r))
+      )
+    } catch (err: any) {
+      alert(err.message || '更新失败')
+    }
+  }
+
   // 按区队分组
   const squad1Reports = reports.filter(r => r.student.squad === '一区队')
   const squad2Reports = reports.filter(r => r.student.squad === '二区队')
@@ -178,7 +201,7 @@ export default function AdminReportsPage() {
                 </h2>
                 <div className="divide-y">
                   {squad1Reports.map((report) => (
-                    <ReportCard key={report.id} report={report} />
+                    <ReportCard key={report.id} report={report} onUpdateInitiator={handleUpdateInitiator} />
                   ))}
                 </div>
               </div>
@@ -192,7 +215,7 @@ export default function AdminReportsPage() {
                 </h2>
                 <div className="divide-y">
                   {squad2Reports.map((report) => (
-                    <ReportCard key={report.id} report={report} />
+                    <ReportCard key={report.id} report={report} onUpdateInitiator={handleUpdateInitiator} />
                   ))}
                 </div>
               </div>
@@ -204,9 +227,23 @@ export default function AdminReportsPage() {
   )
 }
 
-function ReportCard({ report }: { report: Report }) {
+function ReportCard({
+  report,
+  onUpdateInitiator,
+}: {
+  report: Report
+  onUpdateInitiator: (id: string, value: 'student' | 'teacher' | null) => Promise<void>
+}) {
   const [expanded, setExpanded] = useState(false)
+  const [savingInitiator, setSavingInitiator] = useState(false)
   const isRefilled = !!report.refill_resolved_at
+
+  const setInitiator = async (value: 'student' | 'teacher') => {
+    if (report.contact_initiator === value || savingInitiator) return
+    setSavingInitiator(true)
+    await onUpdateInitiator(report.id, value)
+    setSavingInitiator(false)
+  }
 
   return (
     <div className={`p-4 hover:bg-gray-50 ${isRefilled ? 'bg-green-50/50' : ''}`}>
@@ -244,14 +281,14 @@ function ReportCard({ report }: { report: Report }) {
                       ? 'bg-blue-100 text-blue-700'
                       : report.contact_initiator === 'teacher'
                         ? 'bg-purple-100 text-purple-700'
-                        : 'bg-gray-100 text-gray-600'
+                        : 'bg-gray-100 text-gray-500'
                   }`}
                 >
                   {report.contact_initiator === 'student'
-                    ? '学生主动联系'
+                    ? '学生联系'
                     : report.contact_initiator === 'teacher'
-                      ? '老师主动联系'
-                      : '未注明'}
+                      ? '老师联系'
+                      : '未记录'}
                 </span>
                 <span
                   className={`px-2 py-0.5 rounded-full ${
@@ -288,6 +325,38 @@ function ReportCard({ report }: { report: Report }) {
 
       {expanded && (
         <div className="mt-3 space-y-3">
+          {report.contacted_professor && (
+            <div className="p-3 bg-gray-50 rounded-lg">
+              <p className="text-xs text-gray-500 mb-2">联系发起方{!report.contact_initiator && '（这份周报提交时系统还没记录，可在此补录）：'}</p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setInitiator('student')}
+                  disabled={savingInitiator}
+                  className={`px-3 py-1.5 rounded-lg text-sm transition ${
+                    report.contact_initiator === 'student'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-white text-gray-700 border border-gray-300 hover:bg-blue-50'
+                  } disabled:opacity-50`}
+                >
+                  学生联系
+                </button>
+                <button
+                  onClick={() => setInitiator('teacher')}
+                  disabled={savingInitiator}
+                  className={`px-3 py-1.5 rounded-lg text-sm transition ${
+                    report.contact_initiator === 'teacher'
+                      ? 'bg-purple-600 text-white'
+                      : 'bg-white text-gray-700 border border-gray-300 hover:bg-purple-50'
+                  } disabled:opacity-50`}
+                >
+                  老师联系
+                </button>
+                {savingInitiator && (
+                  <span className="text-xs text-gray-400">保存中...</span>
+                )}
+              </div>
+            </div>
+          )}
           {report.not_contacted_reason && (
             <div className="p-3 bg-gray-50 rounded-lg">
               <p className="text-xs text-gray-500 mb-1">未咨询原因/所处阶段：</p>

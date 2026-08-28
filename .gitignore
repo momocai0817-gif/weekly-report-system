@@ -48,3 +48,9 @@ next-env.d.ts
 *.zip
 backups/
 scripts/*.sql
+
+# 本地文件存储（学生签名/周报归档，含个人信息，禁止入库）
+storage/
+
+# 含 Supabase 密钥与管理员密码的说明文件，禁止入库
+ENV_VARIABLES.txt
