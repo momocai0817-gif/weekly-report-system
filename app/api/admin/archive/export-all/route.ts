@@ -65,22 +65,35 @@ async function generateSubmittedExcel(
   year: number,
   squad: string
 ): Promise<Buffer> {
-  const { data: reports, error: reportsError } = await supabase
+  // 本地 PG 兼容层不支持嵌套关联查询/嵌套过滤，拆成两次查询后在代码里按区队过滤
+  const { data: allReports, error: reportsError } = await supabase
     .from('weekly_reports')
-    .select(`
-      *,
-      student:students!inner (
-        name,
-        student_id,
-        squad,
-        advisor
-      )
-    `)
+    .select('*')
     .eq('week_number', week)
     .eq('year', year)
-    .eq('student.squad', squad)
 
   if (reportsError) throw reportsError
+
+  if (!allReports || allReports.length === 0) {
+    throw new Error(`${squad}该周暂无提交记录`)
+  }
+
+  const studentIds = allReports.map((r: any) => r.student_id).filter((id: any) => id)
+  const { data: students, error: studentsError } = await supabase
+    .from('students')
+    .select('id, name, student_id, squad, advisor')
+    .in('id', studentIds)
+
+  if (studentsError) throw studentsError
+
+  const studentMap = new Map(
+    (students || [])
+      .filter((s: any) => s.squad === squad)
+      .map((s: any) => [s.id, s]),
+  )
+  const reports = allReports
+    .filter((r: any) => studentMap.has(r.student_id))
+    .map((r: any) => ({ ...r, student: studentMap.get(r.student_id) }))
 
   if (!reports || reports.length === 0) {
     throw new Error(`${squad}该周暂无提交记录`)
